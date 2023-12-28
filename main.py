@@ -13,7 +13,6 @@ import re
 import asyncio
 import sys
 pn.extension(notifications=True)
-pn.extension(nthreads=0)
 
 input_future = None
 
