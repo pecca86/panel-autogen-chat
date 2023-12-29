@@ -12,6 +12,7 @@ import time
 import re
 import asyncio
 import sys
+import threading
 pn.extension(notifications=True)
 
 input_future = None
@@ -44,10 +45,8 @@ avatar = None
 
 def setup():
     main()
-
+    
 def main():
-    print("Starting program...")
-
     config_list = [
             {
                 "model": "gpt-4-1106-preview",
@@ -441,8 +440,10 @@ def main():
     )
 
     template.servable()
+    # template.show()
 
 if __name__ == "__main__":
-    main()
+    # main()
+    setup()
 
 setup()
