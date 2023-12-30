@@ -15,6 +15,14 @@ import sys
 import threading
 pn.extension(notifications=True)
 
+msg_count = 0
+specifications = {
+    "description": "",
+    "target_audience": "",
+    "type_of_post": "",
+    "tone_of_voice": ""
+}
+
 input_future = None
 
 ## LOAD SPINNER
@@ -28,8 +36,6 @@ original_image_prompt = None
 
 # AGENTS
 user_proxy = None
-question_agent = None
-question_agent_name = None
 linkedin_agent = None
 linkedin_agent_name = None
 critic_agent = None
@@ -73,8 +79,6 @@ def main():
     
     def init_agents():
         global user_proxy
-        global question_agent
-        global question_agent_name
         global linkedin_agent
         global linkedin_agent_name
         global critic_agent
@@ -89,8 +93,6 @@ def main():
 
         class MyConversableAgent(autogen.ConversableAgent):
             global user_proxy
-            global question_agent
-            global question_agent_name
             global linkedin_agent
             global linkedin_agent_name
             global critic_agent
@@ -121,8 +123,6 @@ def main():
                 
                 indicator.value = False
 
-                # prompt = Provide feedback to chat_manager. Press enter to skip and use auto-reply, or type 'exit' to end the conversation:
-                # chat_interface.send(prompt, user="System", respond=False)
                 if not is_post_selected and post_draft_initialized:
                     feedback_button = pn.widgets.Button(name='Use this draft!', button_type='primary')
                     pn.bind(self.continue_chat, feedback_button, watch=True)
@@ -144,26 +144,17 @@ def main():
         user_proxy = MyConversableAgent(
         name="Admin",
         is_termination_msg=lambda x: x.get("content", "").rstrip().endswith("exit"),
-        system_message="""A human admin. First interact with the question_agent to outline what type of LinkedIn post you want to create. Then interact with the linkedin_agent to discuss the linkedin post. Prompt needs to be approved by this admin. 
+        system_message="""A human admin that interacts with the linkedin_agent to discuss the linkedin post. Prompt needs to be approved by this admin. 
         """,
         code_execution_config=False,
         human_input_mode="ALWAYS",
         )
-        question_agent_name = "question_agent"
-        question_agent = autogen.AssistantAgent(
-            name=question_agent_name,
-            system_message="""You are the question_agent. You will begin the conversation by asking the Admin, one question a time, the following questions:
-            1. What sort of post are you aiming to create? (e.g, Humorous, Business, Serious, Quirky)
-            2. Who is your target audience? (e.g, B2B, B2C, Business, Casual Reader, Partner)
-            3. What should the tone of voice be? (e.g, Formal, Informal, Casual, Friendly, Authoritative)
-            You will ALWAYS wait for the Admin response before asking the next question or proceeding to the next agent.
-            In the end summarize all the information and send it to the linkedin_agent.
-            """
-        )
         linkedin_agent_name = "linkedin_agent"
+
+        global specifications
         linkedin_agent = autogen.AssistantAgent(
             name=linkedin_agent_name,
-            system_message="""Create a LinkedIn post based on the Admin message and the base questions asked by the question_agent. Structure the post in the following way:
+            system_message=f"""Create a LinkedIn post based on the following description: {specifications['description']}, with the target audience: {specifications['target_audience']}, type of post: {specifications['type_of_post']} and tone of voice: {specifications['tone_of_voice']}. Structure the post in the following way:
             1. Title
             2. Body
             You will iterate with the critic_agent to improve the tweet based on the critic_agents and the seo_critic_agent feedback. You will stop and wait for Admin feedback once you get a score of 4/5 or above.
@@ -217,11 +208,6 @@ def main():
             reply_func=print_messages, 
             config={"callback": None},
         )
-        question_agent.register_reply(
-            [autogen.Agent, None],
-            reply_func=print_messages,
-            config={"callback": None},
-        )
         linkedin_agent.register_reply(
             [autogen.Agent, None],
             reply_func=print_messages,
@@ -244,10 +230,10 @@ def main():
         )
 
         #### G R O U P C H A T #####
-        groupchat = autogen.GroupChat(agents=[user_proxy, question_agent, linkedin_agent, critic_agent, seo_critic_agent], messages=[], max_round=20)
+        groupchat = autogen.GroupChat(agents=[user_proxy, linkedin_agent, critic_agent, seo_critic_agent], messages=[], max_round=20)
         manager = autogen.GroupChatManager(groupchat=groupchat, llm_config=gpt4_config)
 
-        avatar = {user_proxy.name:"👨‍💼", question_agent.name:"👨‍🔧", linkedin_agent.name:"👩‍💻", critic_agent.name:"👨‍🏫", seo_critic_agent.name:"🤖", image_agent.name:"🌈", "call_dalle": "🪄"}
+        avatar = {user_proxy.name:"👨‍💼", linkedin_agent.name:"👩‍💻", critic_agent.name:"👨‍🏫", seo_critic_agent.name:"🤖", image_agent.name:"🌈", "call_dalle": "🪄"}
 
     ####### COMPONENT FUNCTIONS ########
     def edit_prompt(prompt_input):
@@ -359,20 +345,43 @@ def main():
 
         # Now initiate the chat   
         await agent.a_initiate_chat(recipient, message=message)
+    
+    def base_questions(contents, msg_count):
+        if msg_count == 0:
+            chat_interface.send("What is the target audience of the post?", user="System", respond=False)
+        elif msg_count == 1:
+            chat_interface.send("What is the type of post?", user="System", respond=False)
+        elif msg_count == 2:
+            chat_interface.send("What is the tone of voice?", user="System", respond=False)
+        else:
+            return
 
     async def callback(contents: str, user: str, instance: pn.chat.ChatInterface):
-        
+        global msg_count
+        global specifications
         global initiate_chat_task_created
         global input_future
         global indicator
 
+        # collect specifications from user input
+        if (msg_count < 3):
+            base_questions(contents, msg_count)
+            specifications[list(specifications.keys())[msg_count]] = contents
+            msg_count += 1
+            print(f"Message {msg_count} from {user}: {contents}")
+            return
+        
+        specifications['tone_of_voice'] = contents
+        
         if not initiate_chat_task_created:
             print("Creating task...")
-            if os.getenv("OPENAI_API_KEY") is None:
-                print("MULKKU")
-                chat_interface.send("Please enter you OpenAI key to begin the chat!", user="System", respond=False)
-                return
             init_agents()
+            chat_interface.send(f"""
+                                I want to create a LinkedIn post with the following description: {specifications['description']}.
+                                The target audience is: {specifications['target_audience']}, the type of post is: {specifications['type_of_post']} and the tone of voice is: {specifications['tone_of_voice']}.""", 
+                                user="user_proxy",
+                                respond=False
+                            )
             asyncio.create_task(delayed_initiate_chat(user_proxy, manager, contents))
         else:
             if input_future and not input_future.done():
