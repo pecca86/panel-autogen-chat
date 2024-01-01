@@ -33,6 +33,7 @@ post_draft_initialized = False
 initiate_chat_task_created = False
 final_image_prompt = None
 original_image_prompt = None
+create_image_btn = pn.widgets.Button(name='Create Image', button_type='primary')
 
 # AGENTS
 user_proxy = None
@@ -103,6 +104,7 @@ def main():
             global image_agent_name
             global groupchat
             global manager
+            feedback_button = pn.widgets.Button(name='Use this draft!', button_type='primary')
 
             def continue_chat(self, event):
                 global is_post_selected
@@ -110,6 +112,8 @@ def main():
 
                 if event is None:
                     return
+                self.feedback_button.disabled = True
+                chat_interface.send("Please wait for the image agent to generate a prompt for the image, this can take a while...", user="System", respond=False)
                 indicator.value = True
                 is_post_selected = True
                 input_future.set_result("good!")
@@ -124,9 +128,9 @@ def main():
                 indicator.value = False
 
                 if not is_post_selected and post_draft_initialized:
-                    feedback_button = pn.widgets.Button(name='Use this draft!', button_type='primary')
-                    pn.bind(self.continue_chat, feedback_button, watch=True)
-                    chat_interface.send(pn.Row(feedback_button), user="System", respond=False)
+                    self.feedback_button.disabled = False
+                    pn.bind(self.continue_chat, self.feedback_button, watch=True)
+                    chat_interface.send(pn.Row(self.feedback_button), user="System", respond=False)
                     chat_interface.send("Give feedback in the chat to generate a new draft. Otherwise click the 'use this draft' button.", user="System", respond=False)
                 # Create a new Future object for this input operation if none exists
                 if input_future is None or input_future.done():
@@ -242,8 +246,14 @@ def main():
 
     def post_to_dall_e(event):
         global final_image_prompt
+        global create_image_btn
+
+        create_image_btn.disabled = True
       
         def no_clicked(event):
+            global create_image_btn
+            yes_button.disabled = True
+            no_button.disabled = True
             image_prompt = pn.widgets.TextAreaInput(
                 auto_grow=True, 
                 max_rows=30,
@@ -256,12 +266,15 @@ def main():
             pn.bind(edit_prompt, prompt_input=image_prompt, watch=True)
             chat_interface.send("Edit the prompt / keep the generated prompt. Click the 'Create Image' button to generate the image. Otherwise provide feedback in the chat to generate a new prompt.", user="System", respond=False)
 
-            button = pn.widgets.Button(name='Create Image', button_type='primary')
-            pn.bind(post_to_dall_e, button, watch=True)
+            create_image_btn = pn.widgets.Button(name='Create Image', button_type='primary')
+            pn.bind(post_to_dall_e, create_image_btn, watch=True)
 
-            chat_interface.send(pn.Column(image_prompt, button), user="System", respond=False)
+            chat_interface.send(pn.Column(image_prompt, create_image_btn), user="System", respond=False)
 
         def yes_clicked(events):
+            yes_button.disabled = True
+            no_button.disabled = True
+            create_image_btn.disabled = True
             input_future.cancel()
             chat_interface.disabled = True
             chat_interface.send("Task completed. You can now close this page. If you want to re-run the program, please refresh the page! 🙂", user="System", respond=False)
@@ -292,6 +305,7 @@ def main():
             global original_image_prompt
             global selected_post_text
             global post_draft_initialized
+            global create_image_btn
 
             original_image_prompt = messages[-1]['content']
 
@@ -306,6 +320,7 @@ def main():
                 post_draft_initialized = True
                 selected_post_text = messages[-1]['content']
 
+            # IMAGE PROMPT MESSAGE
             if messages[-1]['name'] == image_agent_name or messages[-1]['name'] == "image_agent":
                 print("Image agent message received")
                 # encapsulate into a function
@@ -320,10 +335,9 @@ def main():
                 )
                 pn.bind(edit_prompt, prompt_input=image_prompt, watch=True)
 
-                button = pn.widgets.Button(name='Create Image', button_type='primary')
-                pn.bind(post_to_dall_e, button, watch=True)
-                
-                chat_interface.send(pn.Column(image_prompt, button), user="System", respond=False)
+                create_image_btn = pn.widgets.Button(name='Create Image', button_type='primary')
+                pn.bind(post_to_dall_e, create_image_btn, watch=True)
+                chat_interface.send(pn.Column(image_prompt, create_image_btn), user="System", respond=False)
 
                 chat_interface.send("Edit the prompt / keep the generated prompt. Click the 'Create Image' button to generate the image. Otherwise provide feedback in the chat to generate a new prompt.", user="System", respond=False)
         else:
@@ -346,6 +360,7 @@ def main():
         # Now initiate the chat   
         await agent.a_initiate_chat(recipient, message=message)
     
+    # inital questions of the chat
     def base_questions(contents, msg_count):
         if msg_count == 0:
             chat_interface.send("What is the target audience of the post?", user="System", respond=False)
@@ -372,16 +387,11 @@ def main():
             return
         
         specifications['tone_of_voice'] = contents
-        
+
         if not initiate_chat_task_created:
             print("Creating task...")
             init_agents()
-            chat_interface.send(f"""
-                                I want to create a LinkedIn post with the following description: {specifications['description']}.
-                                The target audience is: {specifications['target_audience']}, the type of post is: {specifications['type_of_post']} and the tone of voice is: {specifications['tone_of_voice']}.""", 
-                                user="user_proxy",
-                                respond=False
-                            )
+            chat_interface.send("Sending work to the agents, this migh take a while...", user="System", respond=False)
             asyncio.create_task(delayed_initiate_chat(user_proxy, manager, contents))
         else:
             if input_future and not input_future.done():
@@ -430,11 +440,12 @@ def main():
     freq_slider = pn.widgets.FloatSlider(name='Frequency Penalty', start=0, end=1, value=0.5)
     max_rounds_input = pn.widgets.IntInput(name='Max Rounds', value=20, start=1, end=30, step=1)
     pn.bind(set_max_inputs, max_inputs=max_rounds_input, watch=True)
-    type_of_post_selector = pn.widgets.Select(options=['Humorous', 'Business', 'Serious', 'Quirky'], name='Type of Post')
-    target_audience_selector = pn.widgets.Select(options=['B2B', 'B2C', 'Business', 'Casual Reader', 'Partner'], name='Target Audience')
+    # type_of_post_selector = pn.widgets.Select(options=['Humorous', 'Business', 'Serious', 'Quirky'], name='Type of Post')
+    # target_audience_selector = pn.widgets.Select(options=['B2B', 'B2C', 'Business', 'Casual Reader', 'Partner'], name='Target Audience')
     file_input = pn.widgets.FileInput(accept='.csv,.json,.pdf')
 
-    column = pn.Column('Settings', api_key_input, flow_selector, temp_slider, freq_slider, max_rounds_input, type_of_post_selector, target_audience_selector, file_input)
+    # column = pn.Column('Settings', api_key_input, flow_selector, temp_slider, freq_slider, max_rounds_input, type_of_post_selector, target_audience_selector, file_input)
+    column = pn.Column('Settings', api_key_input, flow_selector, temp_slider, freq_slider, max_rounds_input, file_input)
 
     info_accordion = MyAccordion.get_accordion()
 
