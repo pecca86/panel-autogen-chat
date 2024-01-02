@@ -306,7 +306,7 @@ def main():
 
             print("SENDER NAME: ", messages[-1]['name'])
 
-            #TESTING: Don't echo the User message as Admin
+            # Don't echo the User message as Admin in the chat interface
             if messages[-1]['name'] != user_proxy.name:
                 chat_interface.send(messages[-1]['content'], user=messages[-1]['name'], avatar=avatar[messages[-1]['name']], respond=False)
             indicator.value = True
@@ -337,7 +337,6 @@ def main():
                 chat_interface.send("Edit the prompt / keep the generated prompt. Click the 'Create Image' button to generate the image. Otherwise provide feedback in the chat to generate a new prompt.", user="System", respond=False)
         else:
             return False, None  # required to ensure the agent communication flow continues
-        
         return False, None  # required to ensure the agent communication flow continues
 
 
@@ -447,7 +446,7 @@ def main():
 
         except Exception as e:
             print('Failed to delete %s. Reason: %s' % (file_path, e))
-            
+
     file_input = pn.widgets.FileInput(accept='.csv,.json,.pdf')
 
     def save_file(event):
@@ -465,6 +464,7 @@ def main():
             file_to_write.write(file_byte_string)
 
         print(f'File "{uploaded_filename}" saved at "{full_save_path}"')
+        chat_interface.send("File uploaded successfully!", user="System", respond=False)
 
     # Attach the save function to the value parameter
     file_input.param.watch(save_file, 'value')
