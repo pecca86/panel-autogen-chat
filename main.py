@@ -4,15 +4,10 @@ from openai import OpenAI
 import panel as pn
 import json
 from requests_oauthlib import OAuth1Session
-import subprocess
 from info import MyAccordion
 
 import os
-import time
-import re
 import asyncio
-import sys
-import threading
 pn.extension(notifications=True)
 
 msg_count = 0
@@ -440,9 +435,40 @@ def main():
     freq_slider = pn.widgets.FloatSlider(name='Frequency Penalty', start=0, end=1, value=0.5)
     max_rounds_input = pn.widgets.IntInput(name='Max Rounds', value=20, start=1, end=30, step=1)
     pn.bind(set_max_inputs, max_inputs=max_rounds_input, watch=True)
-    # type_of_post_selector = pn.widgets.Select(options=['Humorous', 'Business', 'Serious', 'Quirky'], name='Type of Post')
-    # target_audience_selector = pn.widgets.Select(options=['B2B', 'B2C', 'Business', 'Casual Reader', 'Partner'], name='Target Audience')
+
+    ## FILE INPUT
+    # delete all files in the folder first
+    folder = './uploaded_files/'
+    for filename in os.listdir(folder):
+        file_path = os.path.join(folder, filename)
+        try:
+            if os.path.isfile(file_path) or os.path.islink(file_path):
+                os.unlink(file_path)
+
+        except Exception as e:
+            print('Failed to delete %s. Reason: %s' % (file_path, e))
+            
     file_input = pn.widgets.FileInput(accept='.csv,.json,.pdf')
+
+    def save_file(event):
+        print("Saving file...")
+        uploaded_filename = "test_file.csv"
+        file_byte_string = file_input.value
+        
+        save_path = './uploaded_files/'  # Replace with desired path
+
+        os.makedirs(save_path, exist_ok=True)
+        
+        full_save_path = os.path.join(save_path, uploaded_filename)
+        
+        with open(full_save_path, 'wb') as file_to_write:
+            file_to_write.write(file_byte_string)
+
+        print(f'File "{uploaded_filename}" saved at "{full_save_path}"')
+
+    # Attach the save function to the value parameter
+    file_input.param.watch(save_file, 'value')
+    
 
     # column = pn.Column('Settings', api_key_input, flow_selector, temp_slider, freq_slider, max_rounds_input, type_of_post_selector, target_audience_selector, file_input)
     column = pn.Column('Settings', api_key_input, flow_selector, temp_slider, freq_slider, max_rounds_input, file_input)
