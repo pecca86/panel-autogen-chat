@@ -1,10 +1,11 @@
 import autogen
-import openai
 from openai import OpenAI
 import panel as pn
-import json
-from requests_oauthlib import OAuth1Session
 from info import MyAccordion
+import autogen
+from autogen.agentchat.contrib.retrieve_assistant_agent import RetrieveAssistantAgent
+from autogen.agentchat.contrib.retrieve_user_proxy_agent import RetrieveUserProxyAgent
+from chromadb.utils import embedding_functions
 
 import os
 import asyncio
@@ -15,7 +16,8 @@ specifications = {
     "description": "",
     "target_audience": "",
     "type_of_post": "",
-    "tone_of_voice": ""
+    "tone_of_voice": "",
+    "rag_prompt": ""
 }
 
 input_future = None
@@ -29,8 +31,12 @@ initiate_chat_task_created = False
 final_image_prompt = None
 original_image_prompt = None
 create_image_btn = pn.widgets.Button(name='Create Image', button_type='primary')
+file_name = ""
+file_input = pn.widgets.FileInput(accept='.csv,.json,.pdf,.txt,.md')
 
 # AGENTS
+ragproxyagent = None
+rag_assistant = None
 user_proxy = None
 linkedin_agent = None
 linkedin_agent_name = None
@@ -43,6 +49,7 @@ image_agent_name = None
 groupchat = None
 manager = None
 avatar = None
+
 
 
 def setup():
@@ -74,6 +81,8 @@ def main():
         return image_url
     
     def init_agents():
+        global ragproxyagent
+        global rag_assistant
         global user_proxy
         global linkedin_agent
         global linkedin_agent_name
@@ -88,6 +97,8 @@ def main():
         global avatar
 
         class MyConversableAgent(autogen.ConversableAgent):
+            global ragproxyagent
+            global rag_assistant
             global user_proxy
             global linkedin_agent
             global linkedin_agent_name
@@ -140,6 +151,31 @@ def main():
                 return input_value
 
         ###### A G E N T S #########
+        rag_assistant = RetrieveAssistantAgent(
+            name="rag_assistant",
+            system_message="You are a helpful assistant. You will receive data from the ragproxyagent and provide it to the linkedin_agent.",
+            llm_config={
+                "config_list": config_list,
+                "temperature": 0.1,
+                "frequency_penalty": 0.1,
+            },
+        )
+        global file_name
+        
+        ragproxyagent = RetrieveUserProxyAgent(
+            name="ragproxyagent",
+            system_message="You are the ragproxyagent. You will retrieve content for the rag_assistant to analyze.",
+            human_input_mode="NEVER",
+            retrieve_config={
+                "task": "qa",
+                # "docs_path": "./uploaded_files/test_file.md",
+                "docs_path": f"./uploaded_files/{file_name}",
+                "embedding_function": embedding_functions.OpenAIEmbeddingFunction(
+                    api_key=os.getenv("OPENAI_API_KEY"),
+                    model_name="text-embedding-ada-002",
+                )
+            },
+        )    
         user_proxy = MyConversableAgent(
         name="Admin",
         is_termination_msg=lambda x: x.get("content", "").rstrip().endswith("exit"),
@@ -153,14 +189,14 @@ def main():
         global specifications
         linkedin_agent = autogen.AssistantAgent(
             name=linkedin_agent_name,
-            system_message=f"""Create a LinkedIn post based on the following description: {specifications['description']}, with the target audience: {specifications['target_audience']}, type of post: {specifications['type_of_post']} and tone of voice: {specifications['tone_of_voice']}. Structure the post in the following way:
+            system_message=f"""Create a LinkedIn post based on the input given by the rag_assistant and the following description: {specifications['description']}, with the target audience: {specifications['target_audience']}, type of post: {specifications['type_of_post']} and tone of voice: {specifications['tone_of_voice']}. Structure the post in the following way:
             1. Title
             2. Body
             You will iterate with the critic_agent to improve the tweet based on the critic_agents and the seo_critic_agent feedback. You will stop and wait for Admin feedback once you get a score of 4/5 or above.
             """,
             llm_config={
                 "config_list": config_list,
-                "temperature": 0.5,
+                "temperature": 0.4,
                 "frequency_penalty": 0.1,
             }
         )
@@ -202,6 +238,16 @@ def main():
             }
         )
 
+        ragproxyagent.register_reply(
+            [autogen.Agent, None],
+            reply_func=print_messages, 
+            config={"callback": None},
+        )
+        rag_assistant.register_reply(
+            [autogen.Agent, None],
+            reply_func=print_messages, 
+            config={"callback": None},
+        )
         user_proxy.register_reply(
             [autogen.Agent, None],
             reply_func=print_messages, 
@@ -229,10 +275,14 @@ def main():
         )
 
         #### G R O U P C H A T #####
-        groupchat = autogen.GroupChat(agents=[user_proxy, linkedin_agent, critic_agent, seo_critic_agent], messages=[], max_round=20)
+        if file_input.value is not None:
+            groupchat = autogen.GroupChat(agents=[ragproxyagent, rag_assistant, user_proxy, linkedin_agent, critic_agent, seo_critic_agent], messages=[], max_round=20)
+        else:
+            groupchat = autogen.GroupChat(agents=[user_proxy, linkedin_agent, critic_agent, seo_critic_agent], messages=[], max_round=20)
+
         manager = autogen.GroupChatManager(groupchat=groupchat, llm_config=gpt4_config)
 
-        avatar = {user_proxy.name:"👨‍💼", linkedin_agent.name:"👩‍💻", critic_agent.name:"👨‍🏫", seo_critic_agent.name:"🤖", image_agent.name:"🌈", "call_dalle": "🪄"}
+        avatar = {ragproxyagent.name:"🧠", rag_assistant.name:"👽", user_proxy.name:"👨‍💼", linkedin_agent.name:"👩‍💻", critic_agent.name:"👨‍🏫", seo_critic_agent.name:"🤖", image_agent.name:"🌈", "call_dalle": "🪄"}
 
     ####### COMPONENT FUNCTIONS ########
     def edit_prompt(prompt_input):
@@ -270,7 +320,8 @@ def main():
             yes_button.disabled = True
             no_button.disabled = True
             create_image_btn.disabled = True
-            input_future.cancel()
+            if input_future is not None:
+                input_future.cancel()
             chat_interface.disabled = True
             chat_interface.send("Task completed. You can now close this page. If you want to re-run the program, please refresh the page! 🙂", user="System", respond=False)
 
@@ -305,6 +356,10 @@ def main():
             original_image_prompt = messages[-1]['content']
 
             print("SENDER NAME: ", messages[-1]['name'])
+
+            if messages[-1]['name'] == "ragproxyagent":
+                chat_interface.send("Waiting for the rag_assistant to analyze the data...", user="System", respond=False)
+                return False, None
 
             # Don't echo the User message as Admin in the chat interface
             if messages[-1]['name'] != user_proxy.name:
@@ -352,7 +407,10 @@ def main():
         await asyncio.sleep(0.5)
 
         # Now initiate the chat   
-        await agent.a_initiate_chat(recipient, message=message)
+        if file_input.value is None:
+            await agent.a_initiate_chat(recipient, message=message)
+        else:
+            await agent.a_initiate_chat(recipient, problem=message)
     
     # inital questions of the chat
     def base_questions(contents, msg_count):
@@ -362,6 +420,8 @@ def main():
             chat_interface.send("What is the type of post?", user="System", respond=False)
         elif msg_count == 2:
             chat_interface.send("What is the tone of voice?", user="System", respond=False)
+        elif msg_count == 3:
+            chat_interface.send("Please tell the agents what sort of information you are interested in knowing based on the file you uploaded!", user="System", respond=False)
         else:
             return
 
@@ -373,7 +433,12 @@ def main():
         global indicator
 
         # collect specifications from user input
-        if (msg_count < 3):
+        if file_input.value is None:
+            expected_msg_count = 3
+        else:
+            expected_msg_count = 4
+
+        if (msg_count < expected_msg_count):
             base_questions(contents, msg_count)
             specifications[list(specifications.keys())[msg_count]] = contents
             msg_count += 1
@@ -386,7 +451,12 @@ def main():
             print("Creating task...")
             init_agents()
             chat_interface.send("Sending work to the agents, this migh take a while...", user="System", respond=False)
-            asyncio.create_task(delayed_initiate_chat(user_proxy, manager, contents))
+            if file_input.value is None:
+                print("No RAG Flow\n")
+                asyncio.create_task(delayed_initiate_chat(user_proxy, manager, contents))
+            else:
+                print("RAG Flow\n")
+                asyncio.create_task(delayed_initiate_chat(ragproxyagent, manager, contents))
         else:
             if input_future and not input_future.done():
                 input_future.set_result(contents)
@@ -427,6 +497,7 @@ def main():
         pn.bind(add_openai_key_to_env, key=api_key_input, watch=True)
     else:
         chat_interface.disabled = False
+        # file_input.disabled = True
         chat_interface.send("Give a short description on the LinkedIn Post you wish to create 🙂", user="System", respond=False)
 
     flow_selector = pn.widgets.Select(options=['Twitter', 'LinkedIn', 'Instagram', 'Facebook', 'Web Page'], name='Target Platform')
@@ -447,24 +518,32 @@ def main():
         except Exception as e:
             print('Failed to delete %s. Reason: %s' % (file_path, e))
 
-    file_input = pn.widgets.FileInput(accept='.csv,.json,.pdf')
+    
 
     def save_file(event):
+        global file_name
+        file_name = file_input.filename # so the RAG agent can find it
+
+        # check if file already exists in ./uploaded_files/, if so do not save it
+        if os.path.exists(f"./uploaded_files/{file_name}"):
+            pn.state.notifications.position = "top-center"
+            pn.state.notifications.warning("File already exists!", duration=2500)
+            return
+
         print("Saving file...")
-        uploaded_filename = "test_file.csv"
+        uploaded_filename = file_input.filename
         file_byte_string = file_input.value
-        
         save_path = './uploaded_files/'  # Replace with desired path
 
         os.makedirs(save_path, exist_ok=True)
-        
         full_save_path = os.path.join(save_path, uploaded_filename)
         
         with open(full_save_path, 'wb') as file_to_write:
             file_to_write.write(file_byte_string)
 
         print(f'File "{uploaded_filename}" saved at "{full_save_path}"')
-        chat_interface.send("File uploaded successfully!", user="System", respond=False)
+        pn.state.notifications.position = "top-center"
+        pn.state.notifications.success("File uploaded successfully!", duration=2500)
 
     # Attach the save function to the value parameter
     file_input.param.watch(save_file, 'value')
@@ -479,7 +558,7 @@ def main():
     logout.js_on_click(code="""window.location.href = './logout'""")
     # PANEL
     template = pn.template.MaterialTemplate(
-        title="Autogen Chat",
+        title="iDA Autogen Chat",
         header=[info_accordion, indicator],
         sidebar=[logout, column],
         main=[chat_interface],
@@ -492,4 +571,8 @@ if __name__ == "__main__":
     # main()
     setup()
 
-setup()
+try:
+    setup()
+except:
+    print("Unhandled exception in iDA-chat!")
+    pass
