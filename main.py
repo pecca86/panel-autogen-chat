@@ -168,7 +168,6 @@ def main():
             human_input_mode="NEVER",
             retrieve_config={
                 "task": "qa",
-                # "docs_path": "./uploaded_files/test_file.md",
                 "docs_path": f"./uploaded_files/{file_name}",
                 "embedding_function": embedding_functions.OpenAIEmbeddingFunction(
                     api_key=os.getenv("OPENAI_API_KEY"),
@@ -508,15 +507,15 @@ def main():
 
     ## FILE INPUT
     # delete all files in the folder first
-    folder = './uploaded_files/'
-    for filename in os.listdir(folder):
-        file_path = os.path.join(folder, filename)
-        try:
-            if os.path.isfile(file_path) or os.path.islink(file_path):
-                os.unlink(file_path)
+    # folder = './uploaded_files/'
+    # for filename in os.listdir(folder):
+    #     file_path = os.path.join(folder, filename)
+    #     try:
+    #         if os.path.isfile(file_path) or os.path.islink(file_path):
+    #             os.unlink(file_path)
 
-        except Exception as e:
-            print('Failed to delete %s. Reason: %s' % (file_path, e))
+    #     except Exception as e:
+    #         print('Failed to delete %s. Reason: %s' % (file_path, e))
 
     
 
