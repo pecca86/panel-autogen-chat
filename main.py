@@ -33,6 +33,7 @@ original_image_prompt = None
 create_image_btn = pn.widgets.Button(name='Create Image', button_type='primary')
 file_name = ""
 file_input = pn.widgets.FileInput(accept='.csv,.json,.pdf,.txt,.md')
+rag_selected = False
 
 # AGENTS
 ragproxyagent = None
@@ -274,7 +275,8 @@ def main():
         )
 
         #### G R O U P C H A T #####
-        if file_input.value is not None:
+        # if file_input.value is not None:
+        if rag_selected:
             groupchat = autogen.GroupChat(agents=[ragproxyagent, rag_assistant, user_proxy, linkedin_agent, critic_agent, seo_critic_agent], messages=[], max_round=20)
         else:
             groupchat = autogen.GroupChat(agents=[user_proxy, linkedin_agent, critic_agent, seo_critic_agent], messages=[], max_round=20)
@@ -406,7 +408,8 @@ def main():
         await asyncio.sleep(0.5)
 
         # Now initiate the chat   
-        if file_input.value is None:
+        # if file_input.value is None:
+        if not rag_selected:
             await agent.a_initiate_chat(recipient, message=message)
         else:
             await agent.a_initiate_chat(recipient, problem=message)
@@ -432,7 +435,8 @@ def main():
         global indicator
 
         # collect specifications from user input
-        if file_input.value is None:
+        # if file_input.value is None:
+        if not rag_selected:
             expected_msg_count = 3
         else:
             expected_msg_count = 4
@@ -450,7 +454,8 @@ def main():
             print("Creating task...")
             init_agents()
             chat_interface.send("Sending work to the agents, this migh take a while...", user="System", respond=False)
-            if file_input.value is None:
+            # if file_input.value is None:
+            if not rag_selected:
                 print("No RAG Flow\n")
                 asyncio.create_task(delayed_initiate_chat(user_proxy, manager, contents))
             else:
@@ -485,9 +490,11 @@ def main():
     chat_interface.show_undo = False
 
     ### COMPONENT FUNCTIONS ###
-    def set_max_inputs(max_inputs):
-        print(max_inputs)
-
+    def activate_rag(event):
+        global rag_selected
+        rag_selected = not rag_selected
+        print("RAG selected: ", rag_selected)
+    
     # COLUMN COMPONENTS
     api_key_input = None
     if os.environ.get("OPENAI_API_KEY") is None:
@@ -499,11 +506,12 @@ def main():
         # file_input.disabled = True
         chat_interface.send("Give a short description on the LinkedIn Post you wish to create 🙂", user="System", respond=False)
 
-    flow_selector = pn.widgets.Select(options=['Twitter', 'LinkedIn', 'Instagram', 'Facebook', 'Web Page'], name='Target Platform')
+    flow_selector = pn.widgets.Select(options=['LinkedIn', 'Twitter', 'Instagram', 'Facebook', 'Web Page'], name='Target Platform')
     temp_slider = pn.widgets.FloatSlider(name='Temperature', start=0, end=1, value=0.5)
-    freq_slider = pn.widgets.FloatSlider(name='Frequency Penalty', start=0, end=1, value=0.5)
-    max_rounds_input = pn.widgets.IntInput(name='Max Rounds', value=20, start=1, end=30, step=1)
-    pn.bind(set_max_inputs, max_inputs=max_rounds_input, watch=True)
+    rag_switch = pn.widgets.Switch(name='Switch', align='center')
+    pn.bind(activate_rag, rag_switch, watch=True)
+    rag_switch_label = pn.pane.Markdown("This is a Label for the Switch")
+    labeled_switch = pn.Row(rag_switch_label, rag_switch)
 
     ## FILE INPUT
     # delete all files in the folder first
@@ -517,8 +525,6 @@ def main():
     #     except Exception as e:
     #         print('Failed to delete %s. Reason: %s' % (file_path, e))
 
-    
-
     def save_file(event):
         global file_name
         file_name = file_input.filename # so the RAG agent can find it
@@ -527,6 +533,7 @@ def main():
         if os.path.exists(f"./uploaded_files/{file_name}"):
             pn.state.notifications.position = "top-center"
             pn.state.notifications.warning("File already exists!", duration=2500)
+            file_input.value = None
             return
 
         print("Saving file...")
@@ -549,7 +556,7 @@ def main():
     
 
     # column = pn.Column('Settings', api_key_input, flow_selector, temp_slider, freq_slider, max_rounds_input, type_of_post_selector, target_audience_selector, file_input)
-    column = pn.Column('Settings', api_key_input, flow_selector, temp_slider, freq_slider, max_rounds_input, file_input)
+    column = pn.Column('Settings', api_key_input, flow_selector, temp_slider, file_input, labeled_switch)
 
     info_accordion = MyAccordion.get_accordion()
 
