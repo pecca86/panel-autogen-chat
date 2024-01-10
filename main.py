@@ -1,3 +1,5 @@
+import os
+import asyncio
 import autogen
 from openai import OpenAI
 import panel as pn
@@ -7,8 +9,17 @@ from autogen.agentchat.contrib.retrieve_assistant_agent import RetrieveAssistant
 from autogen.agentchat.contrib.retrieve_user_proxy_agent import RetrieveUserProxyAgent
 from chromadb.utils import embedding_functions
 
-import os
-import asyncio
+
+# import chromadb
+# client = chromadb.PersistentClient(path="./")
+# emb_fn = embedding_functions.OpenAIEmbeddingFunction(
+#                     api_key="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",
+#                     model_name="text-embedding-ada-002",
+#                 )
+# collection = client.get_or_create_collection(name="my_collection", embedding_function=emb_fn)
+# print(collection.count())
+
+
 pn.extension(notifications=True)
 
 msg_count = 0
@@ -32,7 +43,7 @@ final_image_prompt = None
 original_image_prompt = None
 create_image_btn = pn.widgets.Button(name='Create Image', button_type='primary')
 file_name = ""
-file_input = pn.widgets.FileInput(accept='.csv,.json,.pdf,.txt,.md')
+file_input = pn.widgets.FileInput(accept='.csv,.json,.pdf,.txt,.md', name='Upload File', visible=False)
 rag_selected = False
 
 # AGENTS
@@ -167,15 +178,17 @@ def main():
             name="ragproxyagent",
             system_message="You are the ragproxyagent. You will retrieve content for the rag_assistant to analyze.",
             human_input_mode="NEVER",
+            # human_input_mode="TERMINATE",
             retrieve_config={
                 "task": "qa",
                 "docs_path": f"./uploaded_files/{file_name}",
-                "embedding_function": embedding_functions.OpenAIEmbeddingFunction(
-                    api_key=os.getenv("OPENAI_API_KEY"),
-                    model_name="text-embedding-ada-002",
-                )
+                # "embedding_function": embedding_functions.OpenAIEmbeddingFunction(
+                #     api_key=os.getenv("OPENAI_API_KEY"),
+                #     model_name="text-embedding-ada-002",
+                # )
             },
         )    
+        ragproxyagent._get_or_create = True
         user_proxy = MyConversableAgent(
         name="Admin",
         is_termination_msg=lambda x: x.get("content", "").rstrip().endswith("exit"),
@@ -276,7 +289,7 @@ def main():
 
         #### G R O U P C H A T #####
         # if file_input.value is not None:
-        if rag_selected:
+        if rag_selected and file_input.value is not None:
             groupchat = autogen.GroupChat(agents=[ragproxyagent, rag_assistant, user_proxy, linkedin_agent, critic_agent, seo_critic_agent], messages=[], max_round=20)
         else:
             groupchat = autogen.GroupChat(agents=[user_proxy, linkedin_agent, critic_agent, seo_critic_agent], messages=[], max_round=20)
@@ -408,11 +421,11 @@ def main():
         await asyncio.sleep(0.5)
 
         # Now initiate the chat   
-        # if file_input.value is None:
-        if not rag_selected:
-            await agent.a_initiate_chat(recipient, message=message)
+        # In Autogen the RagProxyAgent has the key 'problem' for the first prompt compared to 'message' for UserProxyAgent
+        if rag_selected and file_input.value is not None:
+            await agent.a_initiate_chat(recipient, problem=message) 
         else:
-            await agent.a_initiate_chat(recipient, problem=message)
+            await agent.a_initiate_chat(recipient, message=message)
     
     # inital questions of the chat
     def base_questions(contents, msg_count):
@@ -436,10 +449,10 @@ def main():
 
         # collect specifications from user input
         # if file_input.value is None:
-        if not rag_selected:
-            expected_msg_count = 3
-        else:
+        if rag_selected and file_input.value is not None:
             expected_msg_count = 4
+        else:
+            expected_msg_count = 3
 
         if (msg_count < expected_msg_count):
             base_questions(contents, msg_count)
@@ -455,16 +468,17 @@ def main():
             init_agents()
             chat_interface.send("Sending work to the agents, this migh take a while...", user="System", respond=False)
             # if file_input.value is None:
-            if not rag_selected:
-                print("No RAG Flow\n")
-                asyncio.create_task(delayed_initiate_chat(user_proxy, manager, contents))
-            else:
+            if rag_selected and file_input.value is not None:
                 print("RAG Flow\n")
                 asyncio.create_task(delayed_initiate_chat(ragproxyagent, manager, contents))
+            else:
+                print("No RAG Flow\n")
+                asyncio.create_task(delayed_initiate_chat(user_proxy, manager, contents))
         else:
             if input_future and not input_future.done():
                 input_future.set_result(contents)
             else:
+                chat_interface.send("The program has come to an unexpected halt, please try and refresh the page. If the problem persists, please contact the admin, thank you for your patience! ⭐️", user="System", respond=False)
                 print("No more messages awaited...")
 
     ### G U I  C O M P O N E N T S #####
@@ -493,7 +507,7 @@ def main():
     def activate_rag(event):
         global rag_selected
         rag_selected = not rag_selected
-        print("RAG selected: ", rag_selected)
+        file_input.visible = not file_input.visible
     
     # COLUMN COMPONENTS
     api_key_input = None
@@ -510,20 +524,38 @@ def main():
     temp_slider = pn.widgets.FloatSlider(name='Temperature', start=0, end=1, value=0.5)
     rag_switch = pn.widgets.Switch(name='Switch', align='center')
     pn.bind(activate_rag, rag_switch, watch=True)
-    rag_switch_label = pn.pane.Markdown("This is a Label for the Switch")
+    rag_switch_label = pn.pane.Markdown("Activate RAG Agent")
     labeled_switch = pn.Row(rag_switch_label, rag_switch)
 
-    ## FILE INPUT
+    # FILE INPUT
     # delete all files in the folder first
-    # folder = './uploaded_files/'
-    # for filename in os.listdir(folder):
-    #     file_path = os.path.join(folder, filename)
-    #     try:
-    #         if os.path.isfile(file_path) or os.path.islink(file_path):
-    #             os.unlink(file_path)
+    def delete_files(env=None):
+        folder = './uploaded_files/'
+        for filename in os.listdir(folder):
+            file_path = os.path.join(folder, filename)
+            try:
+                if os.path.isfile(file_path) or os.path.islink(file_path):
+                    os.unlink(file_path)
+                file_input.disabled = False
+                update_uploaded_files()
+            except Exception as e:
+                print('Failed to delete %s. Reason: %s' % (file_path, e))
 
-    #     except Exception as e:
-    #         print('Failed to delete %s. Reason: %s' % (file_path, e))
+    delete_files()
+
+    file_column = pn.Column(width=300)
+    def update_uploaded_files():
+        file_column.clear()
+        for filename in os.listdir('./uploaded_files/'):
+            row = pn.Row()
+            delete_btn =  pn.widgets.Button(name="Delete", button_type="danger")
+            pn.bind(delete_files, delete_btn, watch=True)
+            file = pn.widgets.StaticText(name="File", value=filename, align="center", max_width=230)
+            row.append(file)
+            row.append(delete_btn)
+            file_column.append(row)
+
+    update_uploaded_files()
 
     def save_file(event):
         global file_name
@@ -550,13 +582,17 @@ def main():
         print(f'File "{uploaded_filename}" saved at "{full_save_path}"')
         pn.state.notifications.position = "top-center"
         pn.state.notifications.success("File uploaded successfully!", duration=2500)
+        file_input.disabled = True
+        update_uploaded_files()
 
     # Attach the save function to the value parameter
     file_input.param.watch(save_file, 'value')
     
-
+    # Uploaded files
+    uploaded_files_txt = pn.widgets.StaticText(name='Uploaded File', value='')
+    
     # column = pn.Column('Settings', api_key_input, flow_selector, temp_slider, freq_slider, max_rounds_input, type_of_post_selector, target_audience_selector, file_input)
-    column = pn.Column('Settings', api_key_input, flow_selector, temp_slider, file_input, labeled_switch)
+    column = pn.Column('Settings', api_key_input, flow_selector, temp_slider, labeled_switch, file_input, uploaded_files_txt, file_column)
 
     info_accordion = MyAccordion.get_accordion()
 
@@ -577,8 +613,5 @@ if __name__ == "__main__":
     # main()
     setup()
 
-try:
-    setup()
-except:
-    print("Unhandled exception in iDA-chat!")
-    pass
+
+setup()
