@@ -22,8 +22,7 @@ specifications = {
 
 input_future = None
 
-## LOAD SPINNER
-indicator = pn.indicators.LoadingSpinner(value=False, size=25, styles={'margin-left': '10.5rem'})
+indicator = pn.indicators.LoadingSpinner(value=False, size=25, styles={'margin-left': '10.5rem'}) # load spinner
 selected_post_text = None
 is_post_selected = False
 post_draft_initialized = False
@@ -36,6 +35,7 @@ file_input = pn.widgets.FileInput(accept='.csv,.json,.pdf,.txt,.md', name='Uploa
 rag_selected = False
 
 # AGENTS
+linkedin_agent_temperature = 0.5
 ragproxyagent = None
 rag_assistant = None
 user_proxy = None
@@ -50,8 +50,6 @@ image_agent_name = None
 groupchat = None
 manager = None
 avatar = None
-
-
 
 def setup():
     main()
@@ -98,6 +96,7 @@ def main():
         global avatar
 
         class MyConversableAgent(autogen.ConversableAgent):
+            global linkedin_agent_temperature
             global ragproxyagent
             global rag_assistant
             global user_proxy
@@ -198,7 +197,7 @@ def main():
             """,
             llm_config={
                 "config_list": config_list,
-                "temperature": 0.4,
+                "temperature": linkedin_agent_temperature,
                 "frequency_penalty": 0.1,
             }
         )
@@ -498,6 +497,10 @@ def main():
         rag_selected = not rag_selected
         file_input.visible = not file_input.visible
     
+    def set_temperature(event):
+        global linkedin_agent_temperature
+        linkedin_agent_temperature = temp_slider.value
+    
     # COLUMN COMPONENTS
     api_key_input = None
     if os.environ.get("OPENAI_API_KEY") is None:
@@ -510,7 +513,8 @@ def main():
         chat_interface.send("Give a short description on the LinkedIn Post you wish to create 🙂", user="System", respond=False)
 
     flow_selector = pn.widgets.Select(options=['LinkedIn', 'Twitter', 'Instagram', 'Facebook', 'Web Page'], name='Target Platform')
-    temp_slider = pn.widgets.FloatSlider(name='Temperature', start=0, end=1, value=0.5)
+    temp_slider = pn.widgets.FloatSlider(name='Creativity (0 low, 1 high)', start=0, end=1, value=0.5)
+    pn.bind(set_temperature, temp_slider, watch=True)
     rag_switch = pn.widgets.Switch(name='Switch', align='center')
     pn.bind(activate_rag, rag_switch, watch=True)
     rag_switch_label = pn.pane.Markdown("Activate RAG Agent")
@@ -601,6 +605,5 @@ def main():
 if __name__ == "__main__":
     # main()
     setup()
-
 
 setup()
