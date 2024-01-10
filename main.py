@@ -9,17 +9,6 @@ from autogen.agentchat.contrib.retrieve_assistant_agent import RetrieveAssistant
 from autogen.agentchat.contrib.retrieve_user_proxy_agent import RetrieveUserProxyAgent
 from chromadb.utils import embedding_functions
 
-
-# import chromadb
-# client = chromadb.PersistentClient(path="./")
-# emb_fn = embedding_functions.OpenAIEmbeddingFunction(
-#                     api_key="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",
-#                     model_name="text-embedding-ada-002",
-#                 )
-# collection = client.get_or_create_collection(name="my_collection", embedding_function=emb_fn)
-# print(collection.count())
-
-
 pn.extension(notifications=True)
 
 msg_count = 0
