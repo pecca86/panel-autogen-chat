@@ -14,7 +14,7 @@ class Twitter:
         pass
 
     def get_twitter_chat(self):
-        os.environ["OPENAI_API_KEY"] = "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"
+        os.environ["OPENAI_API_KEY"] = ""
 
         config_list = [
             {
