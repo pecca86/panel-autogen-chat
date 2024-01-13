@@ -5,6 +5,7 @@ import panel as pn
 from info import MyAccordion
 import autogen
 import shutil
+from dotenv import load_dotenv
 
 from ui_utils import AppUI
 
@@ -23,29 +24,15 @@ create_image_btn = pn.widgets.Button(name='Create Image', button_type='primary')
 file_name = ""
 file_input = pn.widgets.FileInput(accept='.csv,.json,.pdf,.txt,.md', name='Upload File', visible=False)
 
-# AGENTS
-agent_temperature = 0.5
-ragproxyagent = None
-rag_assistant = None
-user_proxy = None
-linkedin_agent = None
-linkedin_agent_name = None
-critic_agent = None
-critic_agent_name = None
-seo_critic_agent = None
-seo_critic_agent_name = None
-image_agent = None
-image_agent_name = None
-groupchat = None
-manager = None
-avatar = None
 
 def setup():
+    load_dotenv()
     main()
     
 def main():
     # MAIN COMPONENTS
     ui = AppUI()
+    
     #---------------------------------
     # T W I T T E R  I N T E R F A C E
     #---------------------------------
@@ -59,7 +46,7 @@ def main():
     #-----------------------------------
     # L I N K E D I N  I N T E R F A C E
     #-----------------------------------
-    linked_in_chat_interface = ui.get_linked_in_chat(file_input, agent_temperature)
+    linked_in_chat_interface = ui.get_linked_in_chat(file_input, agent_temperature=0.5)
     linked_in_chat_interface.visible = False
 
     ### COMPONENT FUNCTIONS ###
@@ -159,6 +146,7 @@ def main():
     
     # Uploaded files
     uploaded_files_txt = pn.widgets.StaticText(name='Uploaded File', value='')
+
     
     # column = pn.Column('Settings', api_key_input, flow_selector, temp_slider, freq_slider, max_rounds_input, type_of_post_selector, target_audience_selector, file_input)
     column = pn.Column('Settings', flow_selector, temp_slider, labeled_switch, file_input, uploaded_files_txt, file_column)

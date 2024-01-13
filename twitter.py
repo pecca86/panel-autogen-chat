@@ -14,13 +14,12 @@ class Twitter:
         pass
 
     def get_twitter_chat(self):
-        os.environ["OPENAI_API_KEY"] = ""
 
         config_list = [
             {
                 'model': 'gpt-4-1106-preview',
             }
-            ]
+        ]
         gpt4_config = {"config_list": config_list, "temperature":0, "seed": 53}
 
 

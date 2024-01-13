@@ -36,7 +36,6 @@ class AppUI:
         return twitter.get_twitter_chat()
 
     def get_linked_in_chat(self, file_input, agent_temperature):
-        
         return self.linkedin.get_linked_in_chat(file_input, agent_temperature)
     
     def set_rag(self, rag_selected):

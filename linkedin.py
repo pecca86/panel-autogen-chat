@@ -9,7 +9,6 @@ from autogen.agentchat.contrib.retrieve_user_proxy_agent import RetrieveUserProx
 pn.extension(notifications=True)
 
 indicator = pn.indicators.LoadingSpinner(value=False, size=25, styles={'margin-left': '10.5rem'}) # load spinner
-file_name = ""
 
 class LinkedIn:
     
@@ -52,7 +51,8 @@ class LinkedIn:
         self.original_image_prompt = None
         self.create_image_btn = pn.widgets.Button(name='Create Image', button_type='primary')
 
-        # UI / 
+        # UI /
+        self.file_name = ""
 
     def set_rag(self, rag_selected):
         print("RAG SELECTED: ", rag_selected)
@@ -159,7 +159,6 @@ class LinkedIn:
                     "frequency_penalty": 0.1,
                 },
             )
-            global file_name
             
             self.ragproxyagent = RetrieveUserProxyAgent(
                 name="ragproxyagent",
@@ -168,7 +167,7 @@ class LinkedIn:
                 # human_input_mode="TERMINATE",
                 retrieve_config={
                     "task": "qa",
-                    "docs_path": f"./uploaded_files/{file_name}",
+                    "docs_path": f"./uploaded_files/{self.file_name}",
                     # "embedding_function": embedding_functions.OpenAIEmbeddingFunction(
                     #     api_key=os.getenv("OPENAI_API_KEY"),
                     #     model_name="text-embedding-ada-002",
