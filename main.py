@@ -4,22 +4,13 @@ import autogen
 import panel as pn
 from info import MyAccordion
 import autogen
-
+import shutil
 
 from ui_utils import AppUI
 
 pn.extension(notifications=True)
 
-msg_count = 0
-specifications = {
-    "description": "",
-    "target_audience": "",
-    "type_of_post": "",
-    "tone_of_voice": "",
-    "rag_prompt": ""
-}
 
-input_future = None
 
 indicator = pn.indicators.LoadingSpinner(value=False, size=25, styles={'margin-left': '10.5rem'}) # load spinner
 selected_post_text = None
@@ -31,10 +22,9 @@ original_image_prompt = None
 create_image_btn = pn.widgets.Button(name='Create Image', button_type='primary')
 file_name = ""
 file_input = pn.widgets.FileInput(accept='.csv,.json,.pdf,.txt,.md', name='Upload File', visible=False)
-rag_selected = False
 
 # AGENTS
-linkedin_agent_temperature = 0.5
+agent_temperature = 0.5
 ragproxyagent = None
 rag_assistant = None
 user_proxy = None
@@ -54,43 +44,47 @@ def setup():
     main()
     
 def main():
-
-    def callback(contents: str, user: str, instance: pn.chat.ChatInterface):
-        pass
     # MAIN COMPONENTS
-  
     ui = AppUI()
-    chat_interface1 = ui.get_twitter_chat()
-    chat_interface1.disabled = False
-    chat_interface1.send("Give a fist up my anus.", user="System", respond=False)
+    #---------------------------------
+    # T W I T T E R  I N T E R F A C E
+    #---------------------------------
+    twitter_chat_interface = ui.get_twitter_chat()
+    twitter_chat_interface.disabled = False
     # Chat buttons
-    chat_interface1.show_rerun = False
-    chat_interface1.show_undo = False
-    chat_interface1.visible = False
+    twitter_chat_interface.show_rerun = False
+    twitter_chat_interface.show_undo = False
+    twitter_chat_interface.visible = False
 
-    chat_interface2 = ui.get_linked_in_chat()
-    chat_interface2.visible = False
+    #-----------------------------------
+    # L I N K E D I N  I N T E R F A C E
+    #-----------------------------------
+    linked_in_chat_interface = ui.get_linked_in_chat(file_input, agent_temperature)
+    linked_in_chat_interface.visible = False
 
     ### COMPONENT FUNCTIONS ###
     def activate_rag(event):
-        global rag_selected
-        rag_selected = not rag_selected
+        enabled = rag_switch.value
+        ui.set_rag(enabled)
         file_input.visible = not file_input.visible
     
     def set_temperature(event):
-        global linkedin_agent_temperature
-        linkedin_agent_temperature = temp_slider.value
+        global agent_temperature
+        agent_temperature = temp_slider.value
   
     def append_chat(env):
-        chat_interface2.clear()
-        chat_interface1.clear()
+        linked_in_chat_interface.clear()
+        twitter_chat_interface.clear()
         if flow_selector.value == "LinkedIn":
-            chat_interface2.visible = False
-            chat_interface1.visible = True
+            print("LinkedIn selected")
+            twitter_chat_interface.visible = False
+            linked_in_chat_interface.visible = True
+            linked_in_chat_interface.send("Thanks for selecting Linked In.", user="System", respond=False)
         elif flow_selector.value == "Twitter":
-            chat_interface1.visible = False
-            chat_interface2.visible = True
-            chat_interface2.send("Give a fist up my LinkedIN pippeli.", user="System", respond=False)
+            print("Twitter selected")
+            linked_in_chat_interface.visible = False
+            twitter_chat_interface.visible = True
+            twitter_chat_interface.send("Thanks for selecting Twitter.", user="System", respond=False)
 
     flow_selector = pn.widgets.Select(options=['LinkedIn', 'Twitter', 'Instagram', 'Facebook', 'Web Page'], name='Target Platform')
     pn.bind(append_chat, flow_selector, watch=True)
@@ -178,7 +172,7 @@ def main():
         title="iDA Autogen Chat",
         header=[info_accordion, indicator],
         sidebar=[logout, column],
-        main=[chat_interface1, chat_interface2],
+        main=[twitter_chat_interface, linked_in_chat_interface],
     )
 
     template.servable()
