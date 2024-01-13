@@ -13,6 +13,9 @@ class Twitter:
     def __self__(self):
         pass
 
+
+    # "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"
+
     def get_twitter_chat(self):
         os.environ["OPENAI_API_KEY"] = ""
 

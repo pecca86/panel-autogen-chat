@@ -52,6 +52,8 @@ class LinkedIn:
         self.original_image_prompt = None
         self.create_image_btn = pn.widgets.Button(name='Create Image', button_type='primary')
 
+        # UI / 
+
     def set_rag(self, rag_selected):
         print("RAG SELECTED: ", rag_selected)
         self.rag_selected = rag_selected
