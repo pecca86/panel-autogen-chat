@@ -13,14 +13,6 @@ pn.extension(notifications=True)
 
 
 
-indicator = pn.indicators.LoadingSpinner(value=False, size=25, styles={'margin-left': '10.5rem'}) # load spinner
-selected_post_text = None
-is_post_selected = False
-post_draft_initialized = False
-initiate_chat_task_created = False
-final_image_prompt = None
-original_image_prompt = None
-create_image_btn = pn.widgets.Button(name='Create Image', button_type='primary')
 file_name = ""
 file_input = pn.widgets.FileInput(accept='.csv,.json,.pdf,.txt,.md', name='Upload File', visible=False)
 
@@ -147,8 +139,6 @@ def main():
     # Uploaded files
     uploaded_files_txt = pn.widgets.StaticText(name='Uploaded File', value='')
 
-    
-    # column = pn.Column('Settings', api_key_input, flow_selector, temp_slider, freq_slider, max_rounds_input, type_of_post_selector, target_audience_selector, file_input)
     column = pn.Column('Settings', flow_selector, temp_slider, labeled_switch, file_input, uploaded_files_txt, file_column)
 
     info_accordion = MyAccordion.get_accordion()
@@ -158,7 +148,7 @@ def main():
     # PANEL
     template = pn.template.MaterialTemplate(
         title="iDA Autogen Chat",
-        header=[info_accordion, indicator],
+        header=[info_accordion],
         sidebar=[logout, column],
         main=[twitter_chat_interface, linked_in_chat_interface],
     )

@@ -60,6 +60,8 @@ class LinkedIn:
 
     def get_linked_in_chat(self, file_input, agent_temperature):
         # self.rag_selected = rag_selected
+
+        self.agent_temp = agent_temperature
         
         print("INSIDE LINKEDIN CHAT", self.rag_selected)
         config_list = [
@@ -196,7 +198,7 @@ class LinkedIn:
                 """,
                 llm_config={
                     "config_list": config_list,
-                    "temperature": self.linkedin_agent_temperature,
+                    "temperature": self.agent_temp,
                     "frequency_penalty": 0.1,
                 }
             )
@@ -276,7 +278,6 @@ class LinkedIn:
             )
 
             #### G R O U P C H A T #####
-            # if file_input.value is not None:
             if self.rag_selected and file_input.value is not None:
                 self.groupchat = autogen.GroupChat(agents=[self.ragproxyagent, self.rag_assistant, self.user_proxy, self.linkedin_agent, self.critic_agent, self.seo_critic_agent], messages=[], max_round=20)
                 self.user_proxy.set_groupchat(self.groupchat)
