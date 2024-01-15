@@ -1,13 +1,15 @@
 import os
 import json
+import sys
 from requests_oauthlib import OAuth1Session
 import re
 import asyncio
 import autogen
 import panel as pn
 
-input_future = None
+pn.extension(notifications=True)
 
+input_future = None
 
 class TwitterChat:
     def __init__(self):
@@ -56,11 +58,7 @@ class TwitterChat:
                 print("Please go here and authorize: %s" % authorization_url)
                 return "Please visit the link to authorize: %s. Enter the pin code in the field below." % authorization_url
 
-            def get_shit_done(self, pin_code):    
-                print("PIN ", pin_code)
-                print("Token1 ", self.resource_owner_key)
-                print("Token2 ", self.resource_owner_secret)
-                print("PAYLOAD:", self.payload)
+            def post_tweet(self, pin_code):    
                 verifier = pin_code
 
                 # Get the access token
@@ -119,7 +117,7 @@ class TwitterChat:
             chat_interface.send(f"Trying to post the tweet...", user="System", respond=False)
             chat_interface.disabled = True
             try:
-                response = twitter_client.get_shit_done(pin)
+                response = twitter_client.post_tweet(pin)
             except BaseException as err:
                 chat_interface.send(f"❌ It seems something went wrong, I got the message: {err} Unfortunately I am not able to recover from this error 🙈",  user="System", respond=False) #TODO: Create mechanism for retrying / restarting fresh session
             chat_interface.send(f"✅ Successfully tweeted the post with the following response: {response}",  user="System", respond=False)
@@ -128,7 +126,8 @@ class TwitterChat:
             tweet(key)
 
         async def post_pin():
-            response = twitter_client.tweety(self.tweet_content, chat_interface)
+            # response = twitter_client.tweety(self.tweet_content, chat_interface)
+            response = twitter_client.tweety(user_proxy.get_final_tweet(), chat_interface)
             chat_interface.send(response, user="System", respond=False)
             if self.input_future is not None:
                 self.input_future.cancel()
@@ -136,25 +135,53 @@ class TwitterChat:
             pn.bind(add_key_to_env, key=key_input, watch=True)
             chat_interface.append(key_input)
 
-        import sys
-        async def handle_click(event):
+        async def handle_post(event):
             print("Posting tweet!")
             chat_interface.send("Posting tweet!", user="System", respond=False)
             await post_pin()
 
         class MyConversableAgent(autogen.ConversableAgent):
 
+            final_tweet = None
+
             def set_posted(self, posted):
                 self.posted = posted
 
             def set_input_future(self, input_future):
                 self.input_future = input_future
+            
+            def set_tweet_content(self, tweet_content):
+                self.tweet_content = tweet_content
+
+            def set_final_tweet(self, final_tweet):
+                self.final_tweet = final_tweet
+            
+            def get_final_tweet(self):
+                if self.final_tweet is None:
+                    return self.tweet_content
+                return self.tweet_content
 
             async def a_get_human_input(self, prompt: str) -> str:
+                def edit_tweet(event):
+                    self.set_final_tweet(tweet_text.value)
+                    pn.state.notifications.position = "top-center"
+                    pn.state.notifications.success("Tweet updated!", duration=2000)
+
                 chat_interface.send(prompt, user="System", respond=False)
-                button = pn.widgets.Button(name='Post the tweet!', button_type='primary')
-                pn.bind(handle_click, button, watch=True)
-                chat_interface.append(button)
+                tweet_text = pn.widgets.TextAreaInput(
+                    auto_grow=True, 
+                    max_rows=30,
+                    rows=5, 
+                    value=self.tweet_content, 
+                    name="Image Prompt",
+                    width=1100,
+                    height=150
+                )
+                pn.bind(edit_tweet, tweet_text, watch=True)
+                post_button = pn.widgets.Button(name='Post the tweet!', button_type='primary')
+                pn.bind(handle_post, post_button, watch=True)
+                chat_interface.send(tweet_text, user="System", respond=False)
+                chat_interface.append(post_button)
                 # Create a new Future object for this input operation if none exists
                 if self.posted:
                     return
@@ -202,14 +229,10 @@ class TwitterChat:
             }
         )
 
-
-        ###############
-
         groupchat = autogen.GroupChat(agents=[user_proxy, twitter_agent, critic_agent], messages=[], max_round=20)
         manager = autogen.GroupChatManager(groupchat=groupchat, llm_config=gpt4_config)
 
         avatar = {user_proxy.name:"👨‍💼", twitter_agent.name:"👩‍💻", critic_agent.name:"👨‍🏫"}
-
 
         def print_messages(recipient, messages, sender, config):
 
@@ -219,11 +242,11 @@ class TwitterChat:
                 # Don't echo the User message as Admin in the chat interface
                 if messages[-1]['name'] == user_proxy.name:
                     return False, None  # required to ensure the agent communication flow continues
-                    # chat_interface.send(messages[-1]['content'], user=messages[-1]['name'], avatar=avatar[messages[-1]['name']], respond=False)    
-
+                
                 chat_interface.send(messages[-1]['content'], user=messages[-1]['name'], avatar=avatar[messages[-1]['name']], respond=False)
                 if messages[-1]['name'] == twitter_agent_name:
                     self.tweet_content = messages[-1]['content']
+                    user_proxy.set_tweet_content(self.tweet_content)
             else:
                 return False, None  # required to ensure the agent communication flow continues
             return False, None  # required to ensure the agent communication flow continues

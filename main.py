@@ -57,14 +57,14 @@ def main():
             print("LinkedIn selected")
             twitter_chat_interface.visible = False
             linked_in_chat_interface.visible = True
-            linked_in_chat_interface.send("Thanks for selecting Linked In.", user="System", respond=False)
+            linked_in_chat_interface.send("Thanks for selecting Linked In. Please type in to the chat what sort of an Linked In post you would like to create. You also have the option on selecting the RAG agent to enable me to learn more on the subject from a document of yours. 🦉", user="System", respond=False)
         elif flow_selector.value == "Twitter":
             print("Twitter selected")
             linked_in_chat_interface.visible = False
             twitter_chat_interface.visible = True
-            twitter_chat_interface.send("Thanks for selecting Twitter.", user="System", respond=False)
+            twitter_chat_interface.send("Thanks for selecting Twitter! Type in anything you would like me to create a tweet about! 🐥", user="System", respond=False)
 
-    flow_selector = pn.widgets.Select(options=['LinkedIn', 'Twitter', 'Instagram', 'Facebook', 'Web Page'], name='Target Platform')
+    flow_selector = pn.widgets.Select(options=['', 'LinkedIn', 'Twitter', 'Instagram', 'Facebook', 'Web Page'], name='Target Platform')
     pn.bind(append_chat, flow_selector, watch=True)
 
     temp_slider = pn.widgets.FloatSlider(name='Creativity (0 low, 1 high)', start=0, end=1, value=0.5)
