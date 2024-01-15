@@ -11,11 +11,8 @@ from ui_utils import AppUI
 
 pn.extension(notifications=True)
 
-
-
 file_name = ""
 file_input = pn.widgets.FileInput(accept='.csv,.json,.pdf,.txt,.md', name='Upload File', visible=False)
-
 
 def setup():
     load_dotenv()
@@ -41,7 +38,9 @@ def main():
     linked_in_chat_interface = ui.get_linked_in_chat(file_input, agent_temperature=0.5)
     linked_in_chat_interface.visible = False
 
-    ### COMPONENT FUNCTIONS ###
+    #-------------------------------------
+    # C O M P O N E N T  F U N C T I O N S
+    #-------------------------------------
     def activate_rag(event):
         enabled = rag_switch.value
         ui.set_rag(enabled)

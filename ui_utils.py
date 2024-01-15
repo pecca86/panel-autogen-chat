@@ -11,8 +11,8 @@ import autogen
 from autogen.agentchat.contrib.retrieve_assistant_agent import RetrieveAssistantAgent
 from autogen.agentchat.contrib.retrieve_user_proxy_agent import RetrieveUserProxyAgent
 from chromadb.utils import embedding_functions
-from twitter import Twitter
-from linkedin import LinkedIn
+from twitter import TwitterChat
+from linkedin import LinkedInChat
 
 pn.extension(notifications=True)
 
@@ -23,7 +23,7 @@ class AppUI:
     general_template = None
 
     def __init__(self) -> None:
-        self.linkedin = LinkedIn()
+        self.linkedin = LinkedInChat()
 
     def paint_general_ui(self):
         pass
@@ -32,7 +32,7 @@ class AppUI:
         pass
 
     def get_twitter_chat(self):
-        twitter = Twitter()
+        twitter = TwitterChat()
         return twitter.get_twitter_chat()
 
     def get_linked_in_chat(self, file_input, agent_temperature):

@@ -9,7 +9,7 @@ import panel as pn
 input_future = None
 
 
-class Twitter:
+class TwitterChat:
     def __init__(self):
         self.initiate_chat_task_created = False
         self.posted = False
@@ -17,8 +17,7 @@ class Twitter:
 
     def get_twitter_chat(self):
         pn.extension()
-
-        tweet_content = None
+        self.tweet_content = None
 
         class Tweeter:
             payload = None
@@ -129,22 +128,18 @@ class Twitter:
             tweet(key)
 
         async def post_pin():
-            global tweet_content
-            response = twitter_client.tweety(tweet_content, chat_interface)
-            chat_interface.send(response, user=user_proxy.name, respond=False)
-            # chat_interface.disabled = False
+            response = twitter_client.tweety(self.tweet_content, chat_interface)
+            chat_interface.send(response, user="System", respond=False)
             if self.input_future is not None:
                 self.input_future.cancel()
             key_input = pn.widgets.PasswordInput(placeholder="Seven digits long number", name="Authorization code")
             pn.bind(add_key_to_env, key=key_input, watch=True)
             chat_interface.append(key_input)
 
-
         import sys
         async def handle_click(event):
             print("Posting tweet!")
-            event.disabled = True
-            chat_interface.send("Posting tweet!", user=user_proxy.name, respond=False)
+            chat_interface.send("Posting tweet!", user="System", respond=False)
             await post_pin()
 
         class MyConversableAgent(autogen.ConversableAgent):
@@ -189,14 +184,14 @@ class Twitter:
         twitter_agent_name = "twitter_agent"
         twitter_agent = autogen.AssistantAgent(
             name=twitter_agent_name,
-            system_message="create a tweet based on the user_proxy's message. You will iterate with the critic_agent to improve the tweet based on the critic_agents feedback. You will stop and wait for Admin feedback once you get a score of 4/5 or above.",
+            system_message="create a tweet based on the user_proxy's message. The tweet should NOT have more than 240 words in it, this is IMPORTANT!. You will iterate with the critic_agent to improve the tweet based on the critic_agents feedback. You will stop and wait for Admin feedback once you get a score of 4/5 or above.",
             llm_config={
                 "config_list": config_list,
                 "temperature": 0.5,
                 "frequency_penalty": 0.1,
             }
         )
-        criteria_list = ["grammar", "clarity", "conciseness", "originality", "humor", "emotion", "relevance", "overall"]
+        criteria_list = ["grammar", "clarity", "conciseness", "originality", "humor", "emotion", "relevance", "overall", "word count"]
         critic_agent = autogen.AssistantAgent(
             name="critic_agent",
             system_message=f"You are the critic_agent. You will provide feedback to the twitter_agent on how to improve the tweet. You will provide feedback on the following critera {criteria_list}. You will ALWAYS check that the tweet contains a MAXIMUM of 240 words, this is IMPORTANT! The tweet is good when the score is a minumum of 4/5. Also take into account the Admin's feedback!",
@@ -221,14 +216,16 @@ class Twitter:
             print(f"Messages from: {sender.name} sent to: {recipient.name} | num messages: {len(messages)} | message: {messages[-1]}")
 
             if all(key in messages[-1] for key in ['name']):
+                # Don't echo the User message as Admin in the chat interface
+                if messages[-1]['name'] == user_proxy.name:
+                    return False, None  # required to ensure the agent communication flow continues
+                    # chat_interface.send(messages[-1]['content'], user=messages[-1]['name'], avatar=avatar[messages[-1]['name']], respond=False)    
+
                 chat_interface.send(messages[-1]['content'], user=messages[-1]['name'], avatar=avatar[messages[-1]['name']], respond=False)
                 if messages[-1]['name'] == twitter_agent_name:
-                    global tweet_content
-                    tweet_content = messages[-1]['content']
-                    
+                    self.tweet_content = messages[-1]['content']
             else:
                 return False, None  # required to ensure the agent communication flow continues
-            
             return False, None  # required to ensure the agent communication flow continues
 
         user_proxy.register_reply(

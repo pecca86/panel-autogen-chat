@@ -10,7 +10,7 @@ pn.extension(notifications=True)
 
 indicator = pn.indicators.LoadingSpinner(value=False, size=25, styles={'margin-left': '10.5rem'}) # load spinner
 
-class LinkedIn:
+class LinkedInChat:
     
     def __init__(self):
         self.rag_selected = False
@@ -344,8 +344,6 @@ class LinkedIn:
             self.chat_interface.send(pn.Row(yes_button, no_button), user="System", respond=False)
 
         def print_messages(recipient, messages, sender, config):
-            global indicator
-
             print(f"Messages from: {sender.name} sent to: {recipient.name} | num messages: {len(messages)} | message: {messages[-1]}")
 
             if all(key in messages[-1] for key in ['name']):
@@ -361,7 +359,6 @@ class LinkedIn:
                 # Don't echo the User message as Admin in the chat interface
                 if messages[-1]['name'] != self.user_proxy.name:
                     self.chat_interface.send(messages[-1]['content'], user=messages[-1]['name'], avatar=self.avatar[messages[-1]['name']], respond=False)
-                indicator.value = True
 
                 if messages[-1]['name'] == self.linkedin_agent_name:
                     # self.post_draft_initialized = True
