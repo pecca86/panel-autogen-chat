@@ -19,7 +19,6 @@ def setup():
     main()
     
 def main():
-    # MAIN COMPONENTS
     ui = AppUI()
     
     #---------------------------------
@@ -55,11 +54,15 @@ def main():
         twitter_chat_interface.clear()
         if flow_selector.value == "LinkedIn":
             print("LinkedIn selected")
+            linkedin_column.visible = True
+            twitter_column.visible = False
             twitter_chat_interface.visible = False
             linked_in_chat_interface.visible = True
             linked_in_chat_interface.send("Thanks for selecting Linked In. Please type in to the chat what sort of an Linked In post you would like to create. You also have the option on selecting the RAG agent to enable me to learn more on the subject from a document of yours. 🦉", user="System", respond=False)
         elif flow_selector.value == "Twitter":
             print("Twitter selected")
+            twitter_column.visible = True
+            linkedin_column.visible = False
             linked_in_chat_interface.visible = False
             twitter_chat_interface.visible = True
             twitter_chat_interface.send("Thanks for selecting Twitter! Type in anything you would like me to create a tweet about! 🐥", user="System", respond=False)
@@ -138,25 +141,26 @@ def main():
     # Uploaded files
     uploaded_files_txt = pn.widgets.StaticText(name='Uploaded File', value='')
 
-    column = pn.Column('Settings', flow_selector, temp_slider, labeled_switch, file_input, uploaded_files_txt, file_column)
+    linkedin_column = pn.Column(temp_slider, labeled_switch, file_input, uploaded_files_txt, file_column)
+    linkedin_column.visible = False
+    twitter_column = pn.Column(temp_slider)
+    twitter_column.visible = False 
 
     info_accordion = MyAccordion.get_accordion()
 
     logout = pn.widgets.Button(name="Log out")
     logout.js_on_click(code="""window.location.href = './logout'""")
-    # PANEL
+
     template = pn.template.MaterialTemplate(
         title="iDA Autogen Chat",
         header=[info_accordion],
-        sidebar=[logout, column],
+        sidebar=[logout, "Settings", flow_selector, linkedin_column, twitter_column],
         main=[twitter_chat_interface, linked_in_chat_interface],
     )
 
     template.servable()
-    # template.show()
 
 if __name__ == "__main__":
-    # main()
     setup()
 
 setup()

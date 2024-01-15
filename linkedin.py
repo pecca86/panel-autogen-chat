@@ -63,7 +63,6 @@ class LinkedInChat:
 
         self.agent_temp = agent_temperature
         
-        print("INSIDE LINKEDIN CHAT", self.rag_selected)
         config_list = [
                 {
                     "model": "gpt-4-1106-preview",
