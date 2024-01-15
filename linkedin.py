@@ -348,7 +348,6 @@ class LinkedInChat:
             if all(key in messages[-1] for key in ['name']):
 
                 self.original_image_prompt = messages[-1]['content']
-
                 print("SENDER NAME: ", messages[-1]['name'])
 
                 if messages[-1]['name'] == "ragproxyagent":
@@ -383,14 +382,10 @@ class LinkedInChat:
                     self.create_image_btn = pn.widgets.Button(name='Create Image', button_type='primary')
                     pn.bind(post_to_dall_e, self.create_image_btn, watch=True)
                     self.chat_interface.send(pn.Column(image_prompt, self.create_image_btn), user="System", respond=False)
-
                     self.chat_interface.send("Edit the prompt / keep the generated prompt. Click the 'Create Image' button to generate the image. Otherwise provide feedback in the chat to generate a new prompt.", user="System", respond=False)
             else:
                 return False, None  # required to ensure the agent communication flow continues
             return False, None  # required to ensure the agent communication flow continues
-
-
-        pn.extension(design="material")
 
         async def delayed_initiate_chat(agent, recipient, message):
 
@@ -456,41 +451,9 @@ class LinkedInChat:
                     self.chat_interface.send("The program has come to an unexpected halt, please try and refresh the page. If the problem persists, please contact the admin, thank you for your patience! ⭐️", user="System", respond=False)
                     print("No more messages awaited...")
 
-        ### G U I  C O M P O N E N T S #####
-        def add_openai_key_to_env(key): 
-            SYSTEM_KWARGS = dict(
-                user="System",
-                respond=False,
-            )
-            if not key.startswith("sk-"):
-                self.chat_interface.send("Please enter YOUR OWN ASSHOLE!!", **SYSTEM_KWARGS)
-                return
-
-            os.environ["OPENAI_API_KEY"] = key
-            self.chat_interface.clear()
-            self.chat_interface.send("Give a short description on the LinkedIn Post you wish to create 🙂", user="System", respond=False)
-            self.chat_interface.disabled = False
-
-        # MAIN COMPONENTS
         self.chat_interface = pn.chat.ChatInterface(callback=callback)
-        self.chat_interface.disabled = True
         # Chat buttons
         self.chat_interface.show_rerun = False
         self.chat_interface.show_undo = False
         
-        # COLUMN COMPONENTS
-        api_key_input = None
-        if os.environ.get("OPENAI_API_KEY") is None:
-            self.chat_interface.send("Please enter you OpenAI key to begin the chat WITH YOUR ANUS!", user="System", respond=False)
-            api_key_input = pn.widgets.PasswordInput(placeholder="sk-...", name="OpenAI Key")
-            pn.bind(add_openai_key_to_env, key=api_key_input, watch=True)
-        else:
-            self.chat_interface.disabled = False
-            # file_input.disabled = True
-            self.chat_interface.send("Give a short description on the LinkedIn Post you wish to create 🙂", user="System", respond=False)
-
-
         return self.chat_interface
-
-
-    

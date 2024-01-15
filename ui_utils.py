@@ -16,8 +16,6 @@ from linkedin import LinkedInChat
 
 pn.extension(notifications=True)
 
-
-
 class AppUI:
 
     general_template = None
