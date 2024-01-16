@@ -9,11 +9,11 @@ from autogen.agentchat.contrib.retrieve_user_proxy_agent import RetrieveUserProx
 pn.extension(notifications=True)
 
 
+input_future = None
 class LinkedInChat:
     
     def __init__(self):
         self.rag_selected = False
-        self.input_future = None
         self.initiate_chat_task_created = False
         self.chat_interface = None
 
@@ -93,9 +93,6 @@ class LinkedInChat:
 
                 feedback_button = pn.widgets.Button(name='Use this draft!', button_type='primary')
 
-                def set_input_future(self, input_future):
-                    self.input_future = input_future
-
                 def set_manager(self, manager):
                     self.manager = manager
                 
@@ -115,33 +112,36 @@ class LinkedInChat:
                     self.selected_post_text = selected_post_text
                 
                 def continue_chat(self, event):
-
+                    global input_future
                     if event is None:
                         return
                     self.feedback_button.disabled = True
                     self.chat_interface.send("Please wait for the image agent to generate a prompt for the image, this can take a while...", user="System", respond=False)
+                    self.chat_interface.loading = True
                     self.is_post_selected = True
-                    self.input_future.set_result("good!")
+                    input_future.set_result("good!")
                     self.manager.send(self.selected_post_text, self.image_agent, request_reply=False, silent=True)
                     self.groupchat.agents.append(self.image_agent)
 
                 async def a_get_human_input(self, prompt: str) -> str:
+                    global input_future
 
                     if not self.is_post_selected and self.post_draft_initialized:
                         self.feedback_button.disabled = False
                         pn.bind(self.continue_chat, self.feedback_button, watch=True)
                         self.chat_interface.send(pn.Row(self.feedback_button), user="System", respond=False)
+                        self.chat_interface.loading = False
                         self.chat_interface.send("Give feedback in the chat to generate a new draft. Otherwise click the 'use this draft' button.", user="System", respond=False)
                     # Create a new Future object for this input operation if none exists
-                    if self.input_future is None or self.input_future.done():
-                        self.input_future = asyncio.Future()
+                    if input_future is None or input_future.done():
+                        input_future = asyncio.Future()
 
                     # Wait for the callback to set a result on the future
-                    await self.input_future
+                    await input_future
 
                     # Once the result is set, extract the value and reset the future for the next input operation
-                    input_value = self.input_future.result()
-                    self.input_future = None
+                    input_value = input_future.result()
+                    input_future = None
                     return input_value
 
             ###### A G E N T S #########
@@ -178,7 +178,6 @@ class LinkedInChat:
                 code_execution_config=False,
                 human_input_mode="ALWAYS",
             )
-            self.user_proxy.set_input_future(self.input_future)
             self.user_proxy.set_chat_interface(self.chat_interface)
 
             self.linkedin_agent_name = "linkedin_agent"
@@ -288,8 +287,8 @@ class LinkedInChat:
             self.final_image_prompt = prompt_input
 
         def post_to_dall_e(event):
-
             self.create_image_btn.disabled = True
+            self.chat_interface.loading = True
         
             def no_clicked(event):
                 yes_button.disabled = True
@@ -315,8 +314,8 @@ class LinkedInChat:
                 yes_button.disabled = True
                 no_button.disabled = True
                 self.create_image_btn.disabled = True
-                if self.input_future is not None:
-                    self.input_future.cancel()
+                if input_future is not None:
+                    input_future.cancel()
                 self.chat_interface.disabled = True
                 self.chat_interface.send("Task completed. You can now close this page. If you want to re-run the program, please refresh the page! 🙂", user="System", respond=False)
 
@@ -327,7 +326,7 @@ class LinkedInChat:
             self.chat_interface.send(f"Generating image with the prompt: ```{self.final_image_prompt}```", user="System", respond=False)
             image_url = call_dalle(self.final_image_prompt)
             self.chat_interface.send(image_url, user="System", respond=False)
-
+            self.chat_interface.loading = False
             ### CHECK IF USER IS HAPPY WITH THE IMAGE ###
             self.chat_interface.send("Are you happy with the image?", user="System", respond=False)       
             yes_button = pn.widgets.Button(name='Yes', button_type='primary')
@@ -377,6 +376,7 @@ class LinkedInChat:
                     pn.bind(post_to_dall_e, self.create_image_btn, watch=True)
                     self.chat_interface.send(pn.Column(image_prompt, self.create_image_btn), user="System", respond=False)
                     self.chat_interface.send("Edit the prompt / keep the generated prompt. Click the 'Create Image' button to generate the image. Otherwise provide feedback in the chat to generate a new prompt.", user="System", respond=False)
+                    self.chat_interface.loading = False
             else:
                 return False, None  # required to ensure the agent communication flow continues
             return False, None  # required to ensure the agent communication flow continues
@@ -429,6 +429,7 @@ class LinkedInChat:
                 print("Creating task...")
                 init_agents()
                 self.chat_interface.send("Sending work to the agents, this migh take a while...", user="System", respond=False)
+                self.chat_interface.loading = True
                 # if file_input.value is None:
                 if self.rag_selected and file_input.value is not None:
                     print("RAG Flow\n")
@@ -437,13 +438,31 @@ class LinkedInChat:
                     print("No RAG Flow\n")
                     asyncio.create_task(delayed_initiate_chat(self.user_proxy, self.manager, contents))
             else:
-                if self.input_future and not self.input_future.done():
-                    self.input_future.set_result(contents)
+                if input_future and not input_future.done():
+                    self.chat_interface.loading = True
+                    input_future.set_result(contents)
                 else:
                     self.chat_interface.send("The program has come to an unexpected halt, please try and refresh the page. If the problem persists, please contact the admin, thank you for your patience! ⭐️", user="System", respond=False)
                     print("No more messages awaited...")
 
-        self.chat_interface = pn.chat.ChatInterface(callback=callback)
+        def print_about(instance, event):
+            instance.send("""This is the LinkedIn flow.
+                             The following bugs are known:
+                                - Sometimes the chat manager can pass the user's first input to the critic agent instead of the linked in agent.
+                                - Sometimes the chat inteface does not scroll all the way down, so you need to scroll manually.
+                                - If the requested information from the uploaded document does not match anything that can be found in the document,
+                                    the RAG agent might not work as expected.
+                          """, 
+                          respond=False, 
+                          user="System"
+                        )
+
+        self.chat_interface = pn.chat.ChatInterface(
+            callback=callback, 
+            button_properties={
+                "about": {"callback": print_about, "icon": "help"},
+            }
+        )
         # Chat buttons
         self.chat_interface.show_rerun = False
         self.chat_interface.show_undo = False
