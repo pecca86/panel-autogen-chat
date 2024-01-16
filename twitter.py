@@ -197,6 +197,7 @@ class TwitterChat:
                 pn.bind(edit_tweet, tweet_text, watch=True)
                 post_button = pn.widgets.Button(name='Post the tweet!', button_type='primary')
                 pn.bind(handle_post, post_button, watch=True)
+                self.chat_interface.loading = False
                 self.chat_interface.send(tweet_text, user="System", respond=False)
                 self.chat_interface.append(post_button)
                 # Create a new Future object for this input operation if none exists
@@ -301,22 +302,39 @@ class TwitterChat:
             await agent.a_initiate_chat(recipient, message=message)
 
         async def callback(contents: str, user: str, instance: pn.chat.ChatInterface):
+            print("USER: ", user)
+            self.chat_interface.loading = True
             if not self.initiate_chat_task_created:
                 asyncio.create_task(delayed_initiate_chat(user_proxy, manager, contents))
 
             else:
-                if self.input_future and not self.input_future.done():
+                if self.input_future and not self.input_future.done():                   
                     self.input_future.set_result(contents)
                 else:
                     self.chat_interface.send("Please refresh the browser to create a new chat session!", user="System", respond=False)
                     self.chat_interface.disabled = True
 
-        self.chat_interface = pn.chat.ChatInterface(callback=callback)
-        self.chat_interface.placeholder_text = "homot nussii..."
-        params = {"header": "homotheader"}
-        self.chat_interface.card_params = params
-        self.chat_interface.show_rerun = True
-        self.chat_interface.send("Type an idea for a tweet!", user="System", respond=False)
+
+
+        def print_about(instance, event):
+            instance.send("""This is the twitter flow.
+                             The following bugs are known:
+                                - Sometimes the chat manager can pass the user's first input to the critic agent instead of the twitter agent.
+                                - Sometimes the chat inteface does not scroll all the way down, so you need to scroll manually.
+                          """, 
+                          respond=False, 
+                          user="System"
+                        )
+
+        self.chat_interface = pn.chat.ChatInterface(
+            callback=callback, 
+            button_properties={
+                "about": {"callback": print_about, "icon": "help"},
+            }
+        )
+        self.chat_interface.show_rerun = False
+        self.chat_interface.show_undo = False
+
         user_proxy.set_chat_interface(self.chat_interface)
         return self.chat_interface
             

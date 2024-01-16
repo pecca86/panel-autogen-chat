@@ -19,6 +19,14 @@ def setup():
     
 def main():
     ui = AppUI()
+    hide_loader_css = """
+        .loader.light {
+            display: none;
+        }
+        """
+
+    # Apply the custom CSS to the current application
+    pn.config.raw_css.append(hide_loader_css)
     
     #---------------------------------
     # T W I T T E R  I N T E R F A C E
@@ -143,6 +151,9 @@ def main():
 
     logout = pn.widgets.Button(name="Log out")
     logout.js_on_click(code="""window.location.href = './logout'""")
+
+    spinner = pn.indicators.LoadingSpinner(value=True, align="center", width=50, height=50, name="loading...")
+
 
     template = pn.template.MaterialTemplate(
         title="iDA Autogen Chat",
