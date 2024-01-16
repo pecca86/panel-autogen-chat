@@ -2,7 +2,6 @@ import os
 import asyncio
 import autogen
 import panel as pn
-from info import MyAccordion
 import autogen
 import shutil
 from dotenv import load_dotenv
@@ -25,10 +24,6 @@ def main():
     # T W I T T E R  I N T E R F A C E
     #---------------------------------
     twitter_chat_interface = ui.get_twitter_chat()
-    twitter_chat_interface.disabled = False
-    # Chat buttons
-    twitter_chat_interface.show_rerun = False
-    twitter_chat_interface.show_undo = False
     twitter_chat_interface.visible = False
 
     #-----------------------------------
@@ -146,18 +141,14 @@ def main():
     twitter_column = pn.Column(temp_slider)
     twitter_column.visible = False 
 
-    info_accordion = MyAccordion.get_accordion()
-
     logout = pn.widgets.Button(name="Log out")
     logout.js_on_click(code="""window.location.href = './logout'""")
 
     template = pn.template.MaterialTemplate(
         title="iDA Autogen Chat",
-        header=[info_accordion],
         sidebar=[logout, "Settings", flow_selector, linkedin_column, twitter_column],
         main=[twitter_chat_interface, linked_in_chat_interface],
     )
-
     template.servable()
 
 if __name__ == "__main__":

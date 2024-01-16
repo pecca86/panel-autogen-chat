@@ -6,7 +6,6 @@ import asyncio
 import autogen
 from openai import OpenAI
 import panel as pn
-from info import MyAccordion
 import autogen
 from autogen.agentchat.contrib.retrieve_assistant_agent import RetrieveAssistantAgent
 from autogen.agentchat.contrib.retrieve_user_proxy_agent import RetrieveUserProxyAgent

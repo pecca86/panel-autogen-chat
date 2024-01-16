@@ -12,10 +12,21 @@ pn.extension(notifications=True)
 input_future = None
 
 class TwitterChat:
+
+    chat_interface = None
+
+    loading_spinner = pn.indicators.LoadingSpinner(value=False, width=50, height=50, name="Loading...")
+
     def __init__(self):
         self.initiate_chat_task_created = False
         self.posted = False
         self.input_future = None
+
+    def is_loading(self):
+        self.loading_spinner.value = True
+
+    def is_waiting_input(self):
+        self.loading_spinner.value = False
 
     def get_twitter_chat(self):
         pn.extension()
@@ -25,8 +36,11 @@ class TwitterChat:
             payload = None
             resource_owner_key = None
             resource_owner_secret = None
+            
+            def __init__(self, chat) -> None:
+                self.chat_interface = chat
 
-            def tweety(self, prompt, chat_interface, image=None) -> str:
+            def tweety(self, prompt, image=None) -> str:
                 self.payload = {"text": prompt}
                 print("Payload: ", self.payload["text"])
 
@@ -46,7 +60,7 @@ class TwitterChat:
                     fetch_response = oauth.fetch_request_token(request_token_url)
                 except ValueError:
                     print("There may have been an issue with the consumer_key or consumer_secret you entered.")
-                    chat_interface.send("There may have been an issue with the consumer_key or consumer_secret you entered.", user="System", respond=False)
+                    self.chat_interface.send("There may have been an issue with the consumer_key or consumer_secret you entered.", user="System", respond=False)
 
                 self.resource_owner_key = fetch_response.get("oauth_token")
                 self.resource_owner_secret = fetch_response.get("oauth_token_secret")
@@ -97,16 +111,13 @@ class TwitterChat:
                     )
 
                 print("Response code: {}".format(response.status_code))
-                response_code = "Response code: {}".format(response.status_code)
-                chat_interface.send(response_code, user="System", respond=False)
 
                 # Saving the response as JSON
                 json_response = response.json()
 
                 return json_response
 
-
-        twitter_client = Tweeter()
+        twitter_client = Tweeter(self.chat_interface)
 
         config_list = [{
                 'model': 'gpt-4-1106-preview',
@@ -114,35 +125,38 @@ class TwitterChat:
         gpt4_config = {"config_list": config_list, "temperature":0, "seed": 53}
 
         def tweet(pin):
-            chat_interface.send(f"Trying to post the tweet...", user="System", respond=False)
-            chat_interface.disabled = True
+            self.chat_interface.send(f"Trying to post the tweet...", user="System", respond=False)
+            self.chat_interface.disabled = True
             try:
                 response = twitter_client.post_tweet(pin)
-            except BaseException as err:
-                chat_interface.send(f"❌ It seems something went wrong, I got the message: {err} Unfortunately I am not able to recover from this error 🙈",  user="System", respond=False) #TODO: Create mechanism for retrying / restarting fresh session
-            chat_interface.send(f"✅ Successfully tweeted the post with the following response: {response}",  user="System", respond=False)
 
-        def add_key_to_env(key):
+                print("Response from Twitter: ", response)
+
+                self.chat_interface.send(f"✅ Successfully tweeted the post with the following response: {response}",  user="System", respond=False)
+            except BaseException as err:
+                self.chat_interface.send(f"❌ It seems something went wrong, I got the message: {err}. Unfortunately I am not able to recover from this error 🙈",  user="System", respond=False) #TODO: Create mechanism for retrying / restarting fresh session
+
+        def add_token(key):
             tweet(key)
 
         async def post_pin():
-            # response = twitter_client.tweety(self.tweet_content, chat_interface)
-            response = twitter_client.tweety(user_proxy.get_final_tweet(), chat_interface)
-            chat_interface.send(response, user="System", respond=False)
+            response = twitter_client.tweety(user_proxy.get_final_tweet())
+            self.chat_interface.send(response, user="System", respond=False)
             if self.input_future is not None:
                 self.input_future.cancel()
             key_input = pn.widgets.PasswordInput(placeholder="Seven digits long number", name="Authorization code")
-            pn.bind(add_key_to_env, key=key_input, watch=True)
-            chat_interface.append(key_input)
+            pn.bind(add_token, key=key_input, watch=True)
+            self.chat_interface.append(key_input)
 
         async def handle_post(event):
             print("Posting tweet!")
-            chat_interface.send("Posting tweet!", user="System", respond=False)
+            self.chat_interface.send("Posting tweet!", user="System", respond=False)
             await post_pin()
 
         class MyConversableAgent(autogen.ConversableAgent):
 
             final_tweet = None
+            chat_interface = None
 
             def set_posted(self, posted):
                 self.posted = posted
@@ -160,6 +174,9 @@ class TwitterChat:
                 if self.final_tweet is None:
                     return self.tweet_content
                 return self.tweet_content
+            
+            def set_chat_interface(self, chat_interface):
+                self.chat_interface = chat_interface
 
             async def a_get_human_input(self, prompt: str) -> str:
                 def edit_tweet(event):
@@ -167,7 +184,7 @@ class TwitterChat:
                     pn.state.notifications.position = "top-center"
                     pn.state.notifications.success("Tweet updated!", duration=2000)
 
-                chat_interface.send(prompt, user="System", respond=False)
+                self.chat_interface.send(prompt, user="System", respond=False)
                 tweet_text = pn.widgets.TextAreaInput(
                     auto_grow=True, 
                     max_rows=30,
@@ -180,8 +197,8 @@ class TwitterChat:
                 pn.bind(edit_tweet, tweet_text, watch=True)
                 post_button = pn.widgets.Button(name='Post the tweet!', button_type='primary')
                 pn.bind(handle_post, post_button, watch=True)
-                chat_interface.send(tweet_text, user="System", respond=False)
-                chat_interface.append(post_button)
+                self.chat_interface.send(tweet_text, user="System", respond=False)
+                self.chat_interface.append(post_button)
                 # Create a new Future object for this input operation if none exists
                 if self.posted:
                     return
@@ -243,7 +260,7 @@ class TwitterChat:
                 if messages[-1]['name'] == user_proxy.name:
                     return False, None  # required to ensure the agent communication flow continues
                 
-                chat_interface.send(messages[-1]['content'], user=messages[-1]['name'], avatar=avatar[messages[-1]['name']], respond=False)
+                self.chat_interface.send(messages[-1]['content'], user=messages[-1]['name'], avatar=avatar[messages[-1]['name']], respond=False)
                 if messages[-1]['name'] == twitter_agent_name:
                     self.tweet_content = messages[-1]['content']
                     user_proxy.set_tweet_content(self.tweet_content)
@@ -291,11 +308,16 @@ class TwitterChat:
                 if self.input_future and not self.input_future.done():
                     self.input_future.set_result(contents)
                 else:
-                    chat_interface.send("Please refresh the browser to create a new chat session!", user="System", respond=False)
-                    chat_interface.disabled = True
+                    self.chat_interface.send("Please refresh the browser to create a new chat session!", user="System", respond=False)
+                    self.chat_interface.disabled = True
 
-        chat_interface = pn.chat.ChatInterface(callback=callback)
-        chat_interface.send("Type an idea for a tweet!", user="System", respond=False)
-        return chat_interface
+        self.chat_interface = pn.chat.ChatInterface(callback=callback)
+        self.chat_interface.placeholder_text = "homot nussii..."
+        params = {"header": "homotheader"}
+        self.chat_interface.card_params = params
+        self.chat_interface.show_rerun = True
+        self.chat_interface.send("Type an idea for a tweet!", user="System", respond=False)
+        user_proxy.set_chat_interface(self.chat_interface)
+        return self.chat_interface
             
 

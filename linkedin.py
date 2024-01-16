@@ -8,7 +8,6 @@ from autogen.agentchat.contrib.retrieve_user_proxy_agent import RetrieveUserProx
 
 pn.extension(notifications=True)
 
-indicator = pn.indicators.LoadingSpinner(value=False, size=25, styles={'margin-left': '10.5rem'}) # load spinner
 
 class LinkedInChat:
     
@@ -116,22 +115,17 @@ class LinkedInChat:
                     self.selected_post_text = selected_post_text
                 
                 def continue_chat(self, event):
-                    global indicator
 
                     if event is None:
                         return
                     self.feedback_button.disabled = True
                     self.chat_interface.send("Please wait for the image agent to generate a prompt for the image, this can take a while...", user="System", respond=False)
-                    indicator.value = True
                     self.is_post_selected = True
                     self.input_future.set_result("good!")
                     self.manager.send(self.selected_post_text, self.image_agent, request_reply=False, silent=True)
                     self.groupchat.agents.append(self.image_agent)
 
                 async def a_get_human_input(self, prompt: str) -> str:
-                    global indicator
-                    
-                    indicator.value = False
 
                     if not self.is_post_selected and self.post_draft_initialized:
                         self.feedback_button.disabled = False
@@ -416,8 +410,6 @@ class LinkedInChat:
                 return
 
         async def callback(contents: str, user: str, instance: pn.chat.ChatInterface):
-            global indicator
-
             # collect specifications from user input
             if self.rag_selected and file_input.value is not None:
                 expected_msg_count = 4
