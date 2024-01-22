@@ -472,7 +472,8 @@ class LinkedInChat:
             callback=callback, 
             button_properties={
                 "about": {"callback": print_about, "icon": "help"},
-            }
+            },
+            widgets = [pn.widgets.TextAreaInput(name="Message", value="")],
         )
         # Chat buttons
         self.chat_interface.show_rerun = False

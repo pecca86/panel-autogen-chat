@@ -330,7 +330,8 @@ class TwitterChat:
             callback=callback, 
             button_properties={
                 "about": {"callback": print_about, "icon": "help"},
-            }
+            },
+            widgets = [pn.widgets.TextAreaInput(name="Message", value="")],
         )
         self.chat_interface.show_rerun = False
         self.chat_interface.show_undo = False
