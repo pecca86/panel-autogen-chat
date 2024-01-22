@@ -91,7 +91,7 @@ class LinkedInChat:
 
                 is_post_selected = False
 
-                feedback_button = pn.widgets.Button(name='Use this draft!', button_type='primary')
+                feedback_button = pn.widgets.Button(name="I'm happy, continue to image phase!", button_type='primary')
 
                 def set_manager(self, manager):
                     self.manager = manager
@@ -131,7 +131,7 @@ class LinkedInChat:
                         pn.bind(self.continue_chat, self.feedback_button, watch=True)
                         self.chat_interface.send(pn.Row(self.feedback_button), user="System", respond=False)
                         self.chat_interface.loading = False
-                        self.chat_interface.send("Give feedback in the chat to generate a new draft. Otherwise click the 'use this draft' button.", user="System", respond=False)
+                        self.chat_interface.send("Give feedback in the chat to generate a new draft. Otherwise click the button above to continue.", user="System", respond=False)
                     # Create a new Future object for this input operation if none exists
                     if input_future is None or input_future.done():
                         input_future = asyncio.Future()
@@ -170,6 +170,15 @@ class LinkedInChat:
                 },
             )    
             self.ragproxyagent._get_or_create = True
+            autogen.agentchat.contrib.retrieve_user_proxy_agent.PROMPT_QA = """You're a retrieve augmented chatbot. You answer user's questions based on your own knowledge and the
+                    context provided by the user.
+                    If you can't answer the question with or without the current context, you should reply exactly 'Sorry but I am unable to answer based on the current context'. After this proceed to the linkedin_agent.
+                    You must give as short an answer as possible.
+
+                    User's question is: {input_question}
+
+                    Context is: {input_context}
+                """
             self.user_proxy = MyConversableAgent(
                 name="Admin",
                 is_termination_msg=lambda x: x.get("content", "").rstrip().endswith("exit"),
@@ -433,6 +442,8 @@ class LinkedInChat:
                 # if file_input.value is None:
                 if self.rag_selected and file_input.value is not None:
                     print("RAG Flow\n")
+                    print("STATIC RAG PROMPTS!")
+                    print("PROMPT DEFAULT", autogen.agentchat.contrib.retrieve_user_proxy_agent.PROMPT_DEFAULT)
                     asyncio.create_task(delayed_initiate_chat(self.ragproxyagent, self.manager, contents))
                 else:
                     print("No RAG Flow\n")
