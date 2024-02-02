@@ -159,6 +159,7 @@ class LinkedInChat:
                 name="ragproxyagent",
                 system_message="You are the ragproxyagent. You will retrieve content for the rag_assistant to analyze.",
                 human_input_mode="NEVER",
+                code_execution_config=False,
                 # human_input_mode="TERMINATE",
                 retrieve_config={
                     "task": "qa",
@@ -286,7 +287,7 @@ class LinkedInChat:
                 self.groupchat = autogen.GroupChat(agents=[self.user_proxy, self.linkedin_agent,self.critic_agent, self.seo_critic_agent], messages=[], max_round=20)
                 self.user_proxy.set_groupchat(self.groupchat)
 
-            self.manager = autogen.GroupChatManager(groupchat=self.groupchat, llm_config=gpt4_config)
+            self.manager = autogen.GroupChatManager(groupchat=self.groupchat, llm_config=gpt4_config, code_execution_config=False)
             self.user_proxy.set_manager(self.manager)
 
             self.avatar = {self.ragproxyagent.name:"🧠", self.rag_assistant.name:"👽", self.user_proxy.name:"👨‍💼", self.linkedin_agent.name:"👩‍💻", self.critic_agent.name:"👨‍🏫", self.seo_critic_agent.name:"🤖", self.image_agent.name:"🌈", "call_dalle": "🪄"}

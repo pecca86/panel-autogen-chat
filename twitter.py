@@ -248,7 +248,7 @@ class TwitterChat:
         )
 
         groupchat = autogen.GroupChat(agents=[user_proxy, twitter_agent, critic_agent], messages=[], max_round=20)
-        manager = autogen.GroupChatManager(groupchat=groupchat, llm_config=gpt4_config)
+        manager = autogen.GroupChatManager(groupchat=groupchat, llm_config=gpt4_config, code_execution_config=False)
 
         avatar = {user_proxy.name:"👨‍💼", twitter_agent.name:"👩‍💻", critic_agent.name:"👨‍🏫"}
 

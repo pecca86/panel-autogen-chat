@@ -1,5 +1,6 @@
 from twitter import TwitterChat
 from linkedin import LinkedInChat
+from document_wizard import DocumentWizard
 
 class AppUI:
 
@@ -23,3 +24,7 @@ class AppUI:
     
     def set_rag(self, rag_selected):
         self.linkedin.set_rag(rag_selected)
+
+    def get_document_wizard(self):
+        document_wizard = DocumentWizard()
+        return document_wizard.get_document_wizard_chat()
